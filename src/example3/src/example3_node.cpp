@@ -339,7 +339,7 @@ int main(int argc, char **argv)
     std::ofstream csv_red(result_dir + "RED_analytic.csv");
     std::ofstream csv_blue(result_dir + "BLUE_gd.csv");
 
-    for (int M = 2; M < M_max && ok(); M++)    // 段数
+    for (int M = 99; M < M_max && ok(); M++)    // 段数
     {
         d0_sum = 0.0; d1_sum = 0.0; d2_sum = 0.0; d3_sum = 0.0; d4_sum = 0.0;
         t_lap_sum_0 = 0.0; t_lap_sum_1 = 0.0; t_lap_sum_2 = 0.0; t_lap_sum_3 = 0.0; t_lap_sum_4 = 0.0;
@@ -458,7 +458,7 @@ int main(int argc, char **argv)
             vertices.push_back(end);
 
             mav_trajectory_generation::NonlinearOptimizationParameters parameters;
-            parameters.max_iterations = 1000;
+            parameters.max_iterations = 23;
             parameters.f_rel = 0.05;
             parameters.x_rel = 0.1;
             parameters.time_penalty = amTrajOpt.wTime;

@@ -84,14 +84,25 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
 
         // 考虑中间点
         vector<Vector3d> waypoints = {
+            // s,
+            // Vector3d(-1, -13, 3),
+            // Vector3d(10, -8, 3),
+            // Vector3d(6, 3, 3),
+            // Vector3d(5, 6, 3),
+            // Vector3d(-3, 5, 2),
+            // Vector3d(-13, 7, 3),
+            // Vector3d(-8, -1, 3),
+            // s
+
             s,
-            Vector3d(-1, -13, 3),
-            Vector3d(10, -8, 3),
-            Vector3d(6, 3, 3),
-            Vector3d(5, 6, 3),
-            Vector3d(-3, 5, 2),
-            Vector3d(-13, 7, 3),
-            Vector3d(-8, -1, 3),
+            Vector3d(-4, -5, 3),
+            Vector3d(3, -6, 3),
+            Vector3d(9, -3, 3),
+            Vector3d(4, 3, 3),
+            Vector3d(9, 9, 2),
+            Vector3d(6, 11, 2),
+            Vector3d(0, 3, 3),
+            Vector3d(-7, 7, 3),
             s
         };
         vector<Vector3d> route_temp;
@@ -111,34 +122,49 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
             finVel.setZero();
             finAcc.setZero();
 
-            Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 3);  // 根据Odom获取当前速度、加速度 进行轨迹生成
-            if (traj_cons_AM.getPieceNum() > 0)
+            trajGen.trajOpt.maxIterations = config.iterations * 4;
+            trajGen.trajOpt.epsilon = config.epsilon * 0.01;
+            Trajectory traj_cons_AM_old = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 6);
+            if (traj_cons_AM_old.getPieceNum() > 0)
             {
                 quadrotor_msgs::PolynomialTrajectory trajMsg;
-                polynomialTrajConverter(traj_cons_AM, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
+                polynomialTrajConverter(traj_cons_AM_old, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
                 trajPub.publish(trajMsg);
-                visualization.visualize(traj_cons_AM, route, ros::Time::now(), 1);                
+                visualization.visualize(traj_cons_AM_old, route, ros::Time::now(), 6);
+                std::cout << "t_lap: " << traj_cons_AM_old.getTotalDuration() << std::endl;              
             }
+            
+            // trajGen.trajOpt.maxIterations = config.iterations;
+            // trajGen.trajOpt.epsilon = config.epsilon;
+            // Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 3);  // 根据Odom获取当前速度、加速度 进行轨迹生成
+            // if (traj_cons_AM.getPieceNum() > 0)
+            // {
+            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
+            //     polynomialTrajConverter(traj_cons_AM, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
+            //     trajPub.publish(trajMsg);
+            //     visualization.visualize(traj_cons_AM, route, ros::Time::now(), 1);  
+            //     std::cout << "t_lap: " << traj_cons_AM.getTotalDuration() << std::endl;              
+            // }
 
-            Trajectory traj_cons_AM_with_scale = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 2);
-            if (traj_cons_AM_with_scale.getPieceNum() > 0)
-            {
-                quadrotor_msgs::PolynomialTrajectory trajMsg;
-                polynomialTrajConverter(traj_cons_AM_with_scale, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-                trajPub.publish(trajMsg);
-                visualization.visualize(traj_cons_AM_with_scale, route, ros::Time::now(), 4);
-                std::cout << "t_lap: " << traj_cons_AM_with_scale.getTotalDuration() << std::endl;
-            }
+            // Trajectory traj_cons_AM_with_scale = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 2);
+            // if (traj_cons_AM_with_scale.getPieceNum() > 0)
+            // {
+            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
+            //     polynomialTrajConverter(traj_cons_AM_with_scale, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
+            //     trajPub.publish(trajMsg);
+            //     visualization.visualize(traj_cons_AM_with_scale, route, ros::Time::now(), 4);
+            //     std::cout << "t_lap: " << traj_cons_AM_with_scale.getTotalDuration() << std::endl;
+            // }
 
-            Trajectory traj_cons_NLOT = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 5);
-            if (traj_cons_NLOT.getPieceNum() > 0)
-            {
-                quadrotor_msgs::PolynomialTrajectory trajMsg;
-                polynomialTrajConverter(traj_cons_NLOT, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-                trajPub.publish(trajMsg);
-                visualization.visualize(traj_cons_NLOT, route, ros::Time::now(), 2);
-                std::cout << "t_lap: " << traj_cons_NLOT.getTotalDuration() << std::endl;
-            }
+            // Trajectory traj_cons_NLOT = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 5);
+            // if (traj_cons_NLOT.getPieceNum() > 0)
+            // {
+            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
+            //     polynomialTrajConverter(traj_cons_NLOT, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
+            //     trajPub.publish(trajMsg);
+            //     visualization.visualize(traj_cons_NLOT, route, ros::Time::now(), 3);
+            //     std::cout << "t_lap: " << traj_cons_NLOT.getTotalDuration() << std::endl;
+            // }    
         }
     }
 }
@@ -277,11 +303,23 @@ void Visualization::visualize(const Trajectory &appliedTraj, const vector<Vector
         appliedTrajMarker.color.g = 0.00;
         appliedTrajMarker.color.b = 1.00;            
     }
-    else
+    else if (id == 4)
     {
         appliedTrajMarker.color.r = 0.10;
         appliedTrajMarker.color.g = 0.65;
         appliedTrajMarker.color.b = 0.10;
+    }
+    else if (id == 5)
+    {
+        appliedTrajMarker.color.r = 0.00;
+        appliedTrajMarker.color.g = 0.00;
+        appliedTrajMarker.color.b = 0.00;
+    }
+    else
+    {
+        appliedTrajMarker.color.r = 0.93;
+        appliedTrajMarker.color.g = 0.48;
+        appliedTrajMarker.color.b = 0.26;
     }
         
     if (route.size() > 0)

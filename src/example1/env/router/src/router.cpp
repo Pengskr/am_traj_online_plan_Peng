@@ -84,4 +84,5 @@ RouterNode::onInit()
   listener = nh.subscribe(input, 10, &RouterNode::listenerCallback, this,
                           ros::TransportHints().tcpNoDelay());
   MissionTemplateNode::onInit();
+  startMission();
 }

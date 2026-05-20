@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /Grid1
         - /Drone1
         - /GlobalMap1/GlobalMap1
         - /GlobalMap1/GlobalMap1/Autocompute Value Bounds1
@@ -99,7 +100,7 @@ Visualization Manager:
           Buffer Length: 1
           Class: rviz/Path
           Color: 255; 85; 255
-          Enabled: false
+          Enabled: true
           Head Diameter: 0.30000001192092896
           Head Length: 0.20000000298023224
           Length: 0.30000001192092896
@@ -117,7 +118,7 @@ Visualization Manager:
           Shaft Length: 0.10000000149011612
           Topic: /odom_visualization_1/path
           Unreliable: false
-          Value: false
+          Value: true
         - Class: rviz/Marker
           Enabled: true
           Marker Topic: /odom_visualization_1/robot
@@ -133,8 +134,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 7.562527656555176
-            Min Value: 6.559277244377881e-5
+            Max Value: 5.551000118255615
+            Min Value: 0.0010000000474974513
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -165,7 +166,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Marker
       Namespaces:
-        {}
+        applied_trajectory: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -173,17 +174,17 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/waypoints
       Name: Marker
       Namespaces:
-        {}
+        waypoints: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: false
+      Enabled: true
       Marker Topic: /fsto/visualization/route
       Name: Marker
       Namespaces:
         {}
       Queue Size: 100
-      Value: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -212,25 +213,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 41.54179000854492
+      Distance: 39.1693000793457
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.298747181892395
-        Y: -8.200888633728027
+        X: 1.8310372829437256
+        Y: -7.532107353210449
         Z: 1.1862115859985352
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5497963428497314
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.711573123931885
+      Yaw: 4.7115678787231445
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 4.048277378082275

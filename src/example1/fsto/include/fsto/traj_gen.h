@@ -18,7 +18,7 @@ public:
                         Eigen::Vector3d finalAcc,
                         int id_alg) const;
 
-private:
+public:
     Config config;
     std::shared_ptr<const GlobalMap> glbMapPtr;
     AmTraj trajOpt;
