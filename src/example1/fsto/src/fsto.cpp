@@ -154,17 +154,7 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
             //     trajPub.publish(trajMsg);
             //     visualization.visualize(traj_cons_AM_with_scale, route, ros::Time::now(), 4);
             //     std::cout << "t_lap: " << traj_cons_AM_with_scale.getTotalDuration() << std::endl;
-            // }
-
-            // Trajectory traj_cons_NLOT = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 5);
-            // if (traj_cons_NLOT.getPieceNum() > 0)
-            // {
-            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
-            //     polynomialTrajConverter(traj_cons_NLOT, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-            //     trajPub.publish(trajMsg);
-            //     visualization.visualize(traj_cons_NLOT, route, ros::Time::now(), 3);
-            //     std::cout << "t_lap: " << traj_cons_NLOT.getTotalDuration() << std::endl;
-            // }    
+            // }  
         }
     }
 }

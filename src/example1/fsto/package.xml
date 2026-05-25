@@ -33,13 +33,4 @@
   <run_depend>cv_bridge</run_depend>
   <run_depend>quadrotor_msgs</run_depend>
 
-  <build_depend>mav_trajectory_generation</build_depend>
-  <run_depend>mav_trajectory_generation</run_depend>
-
-  <build_depend>eigen_catkin</build_depend>
-  <run_depend>eigen_catkin</run_depend>
-
-  <build_depend>nlopt</build_depend>
-  <run_depend>nlopt</run_depend>
-
 </package>

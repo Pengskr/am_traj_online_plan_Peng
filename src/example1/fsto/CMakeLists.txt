@@ -21,7 +21,6 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   quadrotor_msgs
   visualization_msgs
-  mav_trajectory_generation
 )
 
 include_directories(

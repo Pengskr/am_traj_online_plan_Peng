@@ -2,7 +2,6 @@
 #define AM_TRAJ_HPP
 
 #include "am_traj/root_finder.hpp"
-#include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 
 #include <vector>
 
@@ -1623,97 +1622,6 @@ public:
         }
         return traj;
     }
-
-
-    Trajectory genOptimalTrajNLOPTC(const std::vector<Eigen::Vector3d> &wayPs,
-                            Eigen::Vector3d iniVel, Eigen::Vector3d iniAcc,
-                            Eigen::Vector3d finVel, Eigen::Vector3d finAcc) const
-    {
-        Trajectory traj;
-        std::vector<double> durs;
-        mav_trajectory_generation::Vertex::Vector vertices;
-        const int dimension = 3;
-        // const int derivative_to_optimize = mav_trajectory_generation::derivative_order::JERK;
-        const int derivative_to_optimize = 2;
-        mav_trajectory_generation::Vertex start(dimension), middle(dimension), end(dimension);
-
-        start.makeStartOrEnd(wayPs[0], derivative_to_optimize);
-        vertices.push_back(start);
-        for (size_t k = 1; k < wayPs.size()-1; k++)
-        {
-            middle.addConstraint(mav_trajectory_generation::derivative_order::POSITION, wayPs[k]);
-            vertices.push_back(middle);
-        }
-        end.makeStartOrEnd(wayPs[wayPs.size()-1], derivative_to_optimize);
-        vertices.push_back(end);
-
-        mav_trajectory_generation::NonlinearOptimizationParameters parameters;
-        parameters.max_iterations = 1000;
-        parameters.f_rel = 0.05;
-        parameters.x_rel = 0.1;
-        parameters.time_penalty = wTime;
-        parameters.use_soft_constraints = true;
-        parameters.print_debug_info = false;
-        parameters.print_debug_info_time_allocation = false;
-        parameters.initial_stepsize_rel = 0.1;
-        parameters.inequality_constraint_tolerance = 0.1;
-        parameters.time_alloc_method = mav_trajectory_generation::NonlinearOptimizationParameters::kRichterTimeAndConstraints;
-        
-        std::vector<double> segment_times;
-        const double v_max = maxVelRate;
-        const double a_max = maxAccRate;
-
-        segment_times = allocateTime(wayPs, 1.0);
-        const int N = 6;
-        mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
-        opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
-        opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
-        opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
-        opt.optimize();
-
-        // mav_traj2am_traj(opt, durs, traj);
-        opt.poly_opt_.getSegmentTimes(&durs);
-        std::vector<CoefficientMat> coeffMats;
-        CoefficientMat coeff;
-        for (size_t idx__segment = 0; idx__segment < opt.poly_opt_.segments_.size(); idx__segment++)
-        {
-            Eigen::VectorXd cx = opt.poly_opt_.segments_[idx__segment][0].getCoefficients();
-            Eigen::VectorXd cy = opt.poly_opt_.segments_[idx__segment][1].getCoefficients();
-            Eigen::VectorXd cz = opt.poly_opt_.segments_[idx__segment][2].getCoefficients();
-
-            coeff.row(0) = cx.reverse().transpose();
-            coeff.row(1) = cy.reverse().transpose();
-            coeff.row(2) = cz.reverse().transpose();
-            coeffMats.push_back(coeff);  // dimention x N
-        }
-        traj = Trajectory(durs, coeffMats);
-        //软约束，常违背约束
-        double ratio = std::max(traj.getMaxVelRate() / v_max / (1.0 - epsilon * epsilon),
-                                sqrt(traj.getMaxAccRate() / a_max / (1.0 - epsilon * epsilon)));
-        traj.scaleTime(1 / ratio);
-
-        return traj;
-    }
 };
-
-// mav_trajectory_generation 转换到 am_traj
-inline void mav_traj2am_traj(mav_trajectory_generation::PolynomialOptimizationNonLinear<6>& opt, std::vector<double>& durs, Trajectory& traj)
-{
-    opt.poly_opt_.getSegmentTimes(&durs);
-    std::vector<CoefficientMat> coeffMats;
-    CoefficientMat coeff;
-    for (size_t idx__segment = 0; idx__segment < opt.poly_opt_.segments_.size(); idx__segment++)
-    {
-        Eigen::VectorXd cx = opt.poly_opt_.segments_[idx__segment][0].getCoefficients();
-        Eigen::VectorXd cy = opt.poly_opt_.segments_[idx__segment][1].getCoefficients();
-        Eigen::VectorXd cz = opt.poly_opt_.segments_[idx__segment][2].getCoefficients();
-
-        coeff.row(0) = cx.reverse().transpose();
-        coeff.row(1) = cy.reverse().transpose();
-        coeff.row(2) = cz.reverse().transpose();
-        coeffMats.push_back(coeff);  // dimention x N
-    }
-    traj = Trajectory(durs, coeffMats);
-}
 
 #endif

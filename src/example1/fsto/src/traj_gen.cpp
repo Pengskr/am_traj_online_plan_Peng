@@ -89,7 +89,7 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
             csv_yellow_pva.close();
             std::cout << "Saved CSV file" << std::endl;
         }
-        else if(id_alg == 6){
+        else{
             traj = trajOpt.genOptimalTrajDTCs3(route, initialVel, initialAcc, finalVel, finalAcc);
             clock_t stop = clock();
             cout << "Fast Spatial-Tenporal Traj Opt(AM_old): " << (stop - start) * 1000.0 / CLOCKS_PER_SEC << " ms" << endl;
@@ -111,29 +111,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
             csv_orange_pva.close();
             std::cout << "Saved CSV file" << std::endl;
         }
-        else{
-            traj = trajOpt.genOptimalTrajNLOPTC(route, initialVel, initialAcc, finalVel, finalAcc);    //NLOPT
-            clock_t stop = clock();
-            cout << "Fast Spatial-Tenporal Traj Opt(NLOPT): " << (stop - start) * 1000.0 / CLOCKS_PER_SEC << " ms" << endl;
-            cout << "Number of Traj Pieces: " << traj.getPieceNum() << endl;
-            cout << "t_lap: " << traj.getTotalDuration() << endl;
-            cout << "cost: " << trajOpt.evaluateObjective(traj) << endl;
-
-            // 保存 位置，速度，加速度曲线，用于MATLAB绘制
-            std::ofstream csv_purple_pva(result_dir + "PURPLE_constrained-AM-pva.csv");
-            for(double t_cur = 0.0; t_cur <= traj.getTotalDuration(); t_cur += 0.01)
-            {
-                Eigen::Vector3d pos = traj.getPos(t_cur);
-                double x = pos(0);
-                double y = pos(1);
-                double z = pos(2);
-                csv_purple_pva << t_cur << "," << x << "," << y << "," << z << "," << traj.getVel(t_cur).norm() << "," << traj.getAcc(t_cur).norm() << "\n";
-
-            }
-            csv_purple_pva.close();
-            std::cout << "Saved CSV file" << std::endl;
-        }
-
     } while (!trajSafeCheck(traj, route));  // 避障安全检查
 
     return traj;
