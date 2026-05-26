@@ -80,40 +80,40 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
         Vector3d g(msg->pose.position.x, msg->pose.position.y, zGoal);
         vector<Vector3d> route;
 
-        // r3planner.planOnce(s, g, route); // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
+        r3planner.planOnce(s, g, route); // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
 
-        // 考虑中间点
-        vector<Vector3d> waypoints = {
-            // s,
-            // Vector3d(-1, -13, 3),
-            // Vector3d(10, -8, 3),
-            // Vector3d(6, 3, 3),
-            // Vector3d(5, 6, 3),
-            // Vector3d(-3, 5, 2),
-            // Vector3d(-13, 7, 3),
-            // Vector3d(-8, -1, 3),
-            // s
+        // // 考虑中间点
+        // vector<Vector3d> waypoints = {
+        //     // s,
+        //     // Vector3d(-1, -13, 3),
+        //     // Vector3d(10, -8, 3),
+        //     // Vector3d(6, 3, 3),
+        //     // Vector3d(5, 6, 3),
+        //     // Vector3d(-3, 5, 2),
+        //     // Vector3d(-13, 7, 3),
+        //     // Vector3d(-8, -1, 3),
+        //     // s
 
-            s,
-            Vector3d(-4, -5, 3),
-            Vector3d(3, -6, 3),
-            Vector3d(9, -3, 3),
-            Vector3d(4, 3, 3),
-            Vector3d(9, 9, 2),
-            Vector3d(6, 11, 2),
-            Vector3d(0, 3, 3),
-            Vector3d(-7, 7, 3),
-            s
-        };
-        vector<Vector3d> route_temp;
-        for (size_t i = 1; i < waypoints.size(); ++i)
-        {
-            route_temp.clear();
-            r3planner.planOnce(waypoints[i-1], waypoints[i], route_temp);   // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
-            // 避免重复连接点
-            if (i > 1 && !route_temp.empty()) route_temp.erase(route_temp.begin());
-            route.insert(route.end(), route_temp.begin(), route_temp.end());
-        }
+        //     s,
+        //     Vector3d(-4, -5, 3),
+        //     Vector3d(3, -6, 3),
+        //     Vector3d(9, -3, 3),
+        //     Vector3d(4, 3, 3),
+        //     Vector3d(9, 9, 2),
+        //     Vector3d(6, 11, 2),
+        //     Vector3d(0, 3, 3),
+        //     Vector3d(-7, 7, 3),
+        //     s
+        // };
+        // vector<Vector3d> route_temp;
+        // for (size_t i = 1; i < waypoints.size(); ++i)
+        // {
+        //     route_temp.clear();
+        //     r3planner.planOnce(waypoints[i-1], waypoints[i], route_temp);   // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
+        //     // 避免重复连接点
+        //     if (i > 1 && !route_temp.empty()) route_temp.erase(route_temp.begin());
+        //     route.insert(route.end(), route_temp.begin(), route_temp.end());
+        // }
 
 
         if (route.size() > 1)
@@ -134,18 +134,6 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
                 std::cout << "t_lap: " << traj_cons_AM_old.getTotalDuration() << std::endl;              
             }
             
-            // trajGen.trajOpt.maxIterations = config.iterations;
-            // trajGen.trajOpt.epsilon = config.epsilon;
-            // Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 3);  // 根据Odom获取当前速度、加速度 进行轨迹生成
-            // if (traj_cons_AM.getPieceNum() > 0)
-            // {
-            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
-            //     polynomialTrajConverter(traj_cons_AM, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-            //     trajPub.publish(trajMsg);
-            //     visualization.visualize(traj_cons_AM, route, ros::Time::now(), 1);  
-            //     std::cout << "t_lap: " << traj_cons_AM.getTotalDuration() << std::endl;              
-            // }
-
             // Trajectory traj_cons_AM_with_scale = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 2);
             // if (traj_cons_AM_with_scale.getPieceNum() > 0)
             // {

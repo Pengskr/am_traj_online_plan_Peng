@@ -3,8 +3,8 @@
 <arg name="simulation"      default="true"/>
 <arg name="yaw"             default="true"/>
 
-<arg name="map_size_x" default="15.0"/>
-<arg name="map_size_y" default="15.0"/>
+<arg name="map_size_x" default="40.0"/>
+<arg name="map_size_y" default="40.0"/>
 <arg name="map_size_z" default="5.0"/>
 
 <!-- Initial position of the drone -->
@@ -199,8 +199,8 @@
     <param name="map/y_size"     value="$(arg map_size_y)" />
     <param name="map/z_size"     value="$(arg map_size_z)" />
 
-    <param name="map/circle_num" value="15"/>        
-    <param name="map/obs_num"    value="50"/>        
+    <param name="map/circle_num" value="100"/>        
+    <param name="map/obs_num"    value="200"/>        
     <param name="map/resolution" value="0.1"/>        
 
     <param name="ObstacleShape/lower_rad" value="0.1"/>
