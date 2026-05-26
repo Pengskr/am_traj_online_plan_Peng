@@ -23,6 +23,7 @@ public:
     void inflateObstacles(double inflateRadius); // 障碍物膨胀
     bool queryOccupied(const Eigen::Vector3d &pos) const; // 查询是否被占据
     void getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
+    void raycastFree(const Eigen::Vector3d &start, const Eigen::Vector3d &end);
 
 private:
     Eigen::Vector3i sizeXYZ;

@@ -20,11 +20,12 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
                              Vector3d initialAcc,
                              Vector3d finalVel,
                              Vector3d finalAcc,
-                             int id_alg) const
+                             int id_alg,
+                             Visualization visualization) const
 {
     Trajectory traj;
 
-    route = routeSimplify(route, config.spatialResolution);     // 道格拉斯-普克（Douglas-Peucker）算法
+    // route = routeSimplify(route, config.spatialResolution);     // 道格拉斯-普克（Douglas-Peucker）算法
 
     if (route.size() < 2 || (route[0] - route[1]).squaredNorm() < FLT_EPSILON)
     {
@@ -40,9 +41,10 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 
         tries++;
         if (tries > config.tryOut)  // 超过最大规划次数
-        {
-            traj.clear();
+        {            
             ROS_WARN("AM_traj planning Fails: tries > tryOut");
+            visualization.visualize(traj, route, ros::Time::now(), 1);   
+            traj.clear();
             break;
         }
 

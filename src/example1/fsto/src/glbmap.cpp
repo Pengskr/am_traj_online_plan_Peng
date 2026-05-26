@@ -240,3 +240,30 @@ void GlobalMap::publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eig
         gridPtr->getLocalPointCloud(msg, pos, radius);
     }
 }
+
+
+void BinaryGridField::raycastFree(const Eigen::Vector3d &start, const Eigen::Vector3d &end)
+{
+    // 将物理坐标转为网格索引
+    Eigen::Vector3i start_idx = ((start - originVec) / linearScale).cast<int>();
+    Eigen::Vector3i end_idx = ((end - originVec) / linearScale).cast<int>();
+
+    // 使用简单的 Bresenham 或 DDA 算法沿线遍历
+    Eigen::Vector3d diff = end - start;
+    double dist = diff.norm();
+    int n_steps = std::ceil(dist / linearScale); // 步长等于分辨率
+
+    for (int i = 0; i < n_steps; ++i) {
+        double ratio = (double)i / n_steps;
+        Eigen::Vector3d p = start + diff * ratio;
+        Eigen::Vector3i idx = ((p - originVec) / linearScale).cast<int>();
+
+        // 越界检查
+        if (idx(0) < 0 || idx(1) < 0 || idx(2) < 0 || 
+            idx(0) >= sizeXYZ(0) || idx(1) >= sizeXYZ(1) || idx(2) >= sizeXYZ(2))
+            continue;
+
+        // 关键：将该位置强制标记为 free (false)
+        occupancyPtr[idx(0) + idx(1) * stepY + idx(2) * stepZ] = false;
+    }
+}

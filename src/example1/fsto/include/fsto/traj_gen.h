@@ -7,6 +7,21 @@
 
 #include <Eigen/Eigen>
 
+class Visualization
+{
+public:
+    Visualization(Config &conf, ros::NodeHandle &nh_);
+
+    Config config;
+    ros::NodeHandle nh;
+
+    ros::Publisher routePub;
+    ros::Publisher wayPointsPub;
+    ros::Publisher appliedTrajectoryPub;
+
+    void visualize(const Trajectory &appliedTraj, const std::vector<Eigen::Vector3d> &route, ros::Time timeStamp, int id);
+};
+
 class TrajGen
 {
 public:
@@ -16,7 +31,8 @@ public:
                         Eigen::Vector3d initialAcc,
                         Eigen::Vector3d finalVel,
                         Eigen::Vector3d finalAcc,
-                        int id_alg) const;
+                        int id_alg,
+                        Visualization visualization) const;
 
 public:
     Config config;

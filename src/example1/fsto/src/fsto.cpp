@@ -145,7 +145,7 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
             finVel.setZero();
             finAcc.setZero();
 
-            Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 3);  // 根据Odom获取当前速度、加速度 进行轨迹生成
+            Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, config.alg, visualization);  // 根据Odom获取当前速度、加速度 进行轨迹生成
             if (traj_cons_AM.getPieceNum() > 0)
             {
                 quadrotor_msgs::PolynomialTrajectory trajMsg;
@@ -265,7 +265,7 @@ void Visualization::visualize(const Trajectory &appliedTraj, const vector<Vector
     appliedTrajMarker = routeMarker;
     appliedTrajMarker.header.frame_id = config.odomFrame;
     appliedTrajMarker.id = id;
-    appliedTrajMarker.ns = "applied_trajectory";
+    appliedTrajMarker.ns = "trajectory";
     appliedTrajMarker.scale.x = 0.15;
     if (id == 0)
     {

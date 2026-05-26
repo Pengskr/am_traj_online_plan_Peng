@@ -21,21 +21,6 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-class Visualization
-{
-public:
-    Visualization(Config &conf, ros::NodeHandle &nh_);
-
-    Config config;
-    ros::NodeHandle nh;
-
-    ros::Publisher routePub;
-    ros::Publisher wayPointsPub;
-    ros::Publisher appliedTrajectoryPub;
-
-    void visualize(const Trajectory &appliedTraj, const std::vector<Eigen::Vector3d> &route, ros::Time timeStamp, int id);
-};
-
 class MavGlobalPlanner
 {
 public:
