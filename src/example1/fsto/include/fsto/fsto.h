@@ -57,7 +57,7 @@ public:
     void trajTriggerCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg);
     ros::Publisher trajPub;
     ros::Publisher autoManualPub;
-    ros::Publisher inflate_map_pub_; // 膨胀地图发布器
+    ros::Publisher inflate_map_pub; // 膨胀地图发布器
 
     static void polynomialTrajConverter(const Trajectory &traj,
                                         quadrotor_msgs::PolynomialTrajectory &trajMsg,

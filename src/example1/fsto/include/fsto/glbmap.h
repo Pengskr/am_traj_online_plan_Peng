@@ -22,7 +22,7 @@ public:
     void setOccupied(const Eigen::Vector3d &pos);
     void inflateObstacles(double inflateRadius); // 障碍物膨胀
     bool queryOccupied(const Eigen::Vector3d &pos) const; // 查询是否被占据
-    void getPointCloud(sensor_msgs::PointCloud2 &msg) const; // 转换为点云
+    void getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
 
 private:
     Eigen::Vector3i sizeXYZ;
@@ -41,7 +41,7 @@ public:
     ~GlobalMap();
     void initialize(const sensor_msgs::PointCloud2::ConstPtr &msg);
     bool safeQuery(const Eigen::Vector3d &p, double safeRadius) const;
-    void publishInflatedMap(sensor_msgs::PointCloud2 &msg) const; // 供上层调用的接口
+    void publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
 
 private:
     Config config;

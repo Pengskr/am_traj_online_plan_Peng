@@ -27,6 +27,7 @@ struct Config
     double unitScaleInSI;
     double r3SafeRadius;
     double bodySafeRadius;
+    double sensingRadius;
     double edfResolution;
     std::vector<double> r3Bound;
     double searchDuration;
@@ -56,6 +57,7 @@ struct Config
         nh_priv.getParam("UnitScaleInSI", conf.unitScaleInSI);
         nh_priv.getParam("R3SafeRadius", conf.r3SafeRadius);
         nh_priv.getParam("BodySafeRadius", conf.bodySafeRadius);
+        nh_priv.getParam("SensingRadius", conf.sensingRadius);
         nh_priv.getParam("EdfResolution", conf.edfResolution);
         nh_priv.getParam("R3Bound", conf.r3Bound);
         nh_priv.getParam("SearchDuration", conf.searchDuration);

@@ -160,51 +160,83 @@ bool GlobalMap::safeQuery(const Vector3d &p, double safeRadius) const
     return !gridPtr->queryOccupied(p);
 }
 
-void BinaryGridField::getPointCloud(sensor_msgs::PointCloud2 &msg) const
+void BinaryGridField::getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
 {
-    // 1. 统计当前有多少个被占据（包含膨胀后）的体素
+    // 1. 将无人机的物理坐标转换为网格索引
+    int cx = (pos(0) - originVec(0)) / linearScale;
+    int cy = (pos(1) - originVec(1)) / linearScale;
+    int cz = (pos(2) - originVec(2)) / linearScale;
+    int r_vox = std::ceil(radius / linearScale);
+
+    // 2. 计算包围盒并进行严格的边界截断 (Boundary Clipping)
+    int x_min = std::max(0, cx - r_vox);
+    int x_max = std::min(sizeXYZ(0) - 1, cx + r_vox);
+    int y_min = std::max(0, cy - r_vox);
+    int y_max = std::min(sizeXYZ(1) - 1, cy + r_vox);
+    int z_min = std::max(0, cz - r_vox);
+    int z_max = std::min(sizeXYZ(2) - 1, cz + r_vox);
+
+    double radiusSqr = radius * radius;
+
+    // 3. 第一遍遍历：统计球体内的碰撞点数量（用于分配点云内存）
     size_t num_points = 0;
-    size_t total_voxels = size_t(sizeXYZ(0)) * sizeXYZ(1) * sizeXYZ(2);
-    for (size_t i = 0; i < total_voxels; ++i) {
-        if (occupancyPtr[i]) {
-            num_points++;
+    for (int x = x_min; x <= x_max; x++) {
+        for (int y = y_min; y <= y_max; y++) {
+            for (int z = z_min; z <= z_max; z++) {
+                if (occupancyPtr[x + y * stepY + z * stepZ]) {
+                    // 还原为物理坐标，计算到中心的平方距离
+                    double px = x * linearScale + originVec(0) + linearScale / 2.0;
+                    double py = y * linearScale + originVec(1) + linearScale / 2.0;
+                    double pz = z * linearScale + originVec(2) + linearScale / 2.0;
+                    double distSqr = (px - pos(0))*(px - pos(0)) + (py - pos(1))*(py - pos(1)) + (pz - pos(2))*(pz - pos(2));
+                    
+                    if (distSqr <= radiusSqr) {
+                        num_points++;
+                    }
+                }
+            }
         }
     }
 
-    // 2. 初始化 PointCloud2 消息结构
+    // 4. 初始化 PointCloud2
     msg.height = 1;
     msg.width = num_points;
     msg.is_bigendian = false;
     msg.is_dense = true;
 
-    // 使用 Modifier 设置字段为标准 xyz 格式并分配内存
     sensor_msgs::PointCloud2Modifier modifier(msg);
     modifier.setPointCloud2FieldsByString(1, "xyz");
     modifier.resize(num_points);
 
-    // 创建安全迭代器
     sensor_msgs::PointCloud2Iterator<float> iter_x(msg, "x");
     sensor_msgs::PointCloud2Iterator<float> iter_y(msg, "y");
     sensor_msgs::PointCloud2Iterator<float> iter_z(msg, "z");
 
-    // 3. 将被占据体素的网格中心坐标填入点云
-    for (int x = 0; x < sizeXYZ(0); x++) {
-        for (int y = 0; y < sizeXYZ(1); y++) {
-            for (int z = 0; z < sizeXYZ(2); z++) {
+    // 5. 第二遍遍历：填充点云数据
+    for (int x = x_min; x <= x_max; x++) {
+        for (int y = y_min; y <= y_max; y++) {
+            for (int z = z_min; z <= z_max; z++) {
                 if (occupancyPtr[x + y * stepY + z * stepZ]) {
-                    *iter_x = x * linearScale + originVec(0) + linearScale / 2.0;
-                    *iter_y = y * linearScale + originVec(1) + linearScale / 2.0;
-                    *iter_z = z * linearScale + originVec(2) + linearScale / 2.0;
-                    ++iter_x; ++iter_y; ++iter_z;
+                    double px = x * linearScale + originVec(0) + linearScale / 2.0;
+                    double py = y * linearScale + originVec(1) + linearScale / 2.0;
+                    double pz = z * linearScale + originVec(2) + linearScale / 2.0;
+                    double distSqr = (px - pos(0))*(px - pos(0)) + (py - pos(1))*(py - pos(1)) + (pz - pos(2))*(pz - pos(2));
+                    
+                    if (distSqr <= radiusSqr) {
+                        *iter_x = px;
+                        *iter_y = py;
+                        *iter_z = pz;
+                        ++iter_x; ++iter_y; ++iter_z;
+                    }
                 }
             }
         }
     }
 }
 
-void GlobalMap::publishInflatedMap(sensor_msgs::PointCloud2 &msg) const
+void GlobalMap::publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
 {
     if (gridPtr != nullptr) {
-        gridPtr->getPointCloud(msg);
+        gridPtr->getLocalPointCloud(msg, pos, radius);
     }
 }

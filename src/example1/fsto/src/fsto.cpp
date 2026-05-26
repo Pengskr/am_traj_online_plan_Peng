@@ -24,7 +24,7 @@ MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
                                   TransportHints().tcpNoDelay());
     trajPub = nh.advertise<quadrotor_msgs::PolynomialTrajectory>(config.trajectoryTopic, 1);
     autoManualPub = nh.advertise<sensor_msgs::Joy>(config.autoManualTopic, 1);
-    inflate_map_pub_ = nh.advertise<sensor_msgs::PointCloud2>(config.inflateMapTopic, 1);
+    inflate_map_pub = nh.advertise<sensor_msgs::PointCloud2>(config.inflateMapTopic, 1);
     odomStamp = Time::now();
 }
 
@@ -42,6 +42,28 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
     odomStamp = Time::now();
 
     odomInitialized = true;
+
+    // ======= 新增：降频发布局部感知膨胀地图 =======
+    static ros::Time last_pub_time = ros::Time::now();
+    if ((msg->header.stamp - last_pub_time).toSec() > 0.1) // 限制发布频率为 10Hz
+    {
+        if (glbMapPtr != nullptr) 
+        {
+            sensor_msgs::PointCloud2 inflate_msg;
+            
+            Eigen::Vector3d current_pos(msg->pose.pose.position.x, 
+                                        msg->pose.pose.position.y, 
+                                        msg->pose.pose.position.z);
+            
+            glbMapPtr->publishLocalInflatedMap(inflate_msg, current_pos, config.sensingRadius); 
+            
+            inflate_msg.header.stamp = msg->header.stamp;
+            inflate_msg.header.frame_id = config.odomFrame;
+            inflate_map_pub.publish(inflate_msg);
+        }
+        last_pub_time = msg->header.stamp;
+    }
+    // ============================================
 }
 
 void MavGlobalPlanner::imuCallBack(const sensor_msgs::Imu::ConstPtr &msg)
@@ -67,15 +89,6 @@ void MavGlobalPlanner::mapCallBack(const sensor_msgs::PointCloud2::ConstPtr &msg
     {
         glbMapPtr->initialize(msg);
         mapInitialized = true;
-
-        sensor_msgs::PointCloud2 inflate_msg;
-        glbMapPtr->publishInflatedMap(inflate_msg); 
-        // 保持时间戳与坐标系的一致性
-        inflate_msg.header.stamp = msg->header.stamp;
-        inflate_msg.header.frame_id = msg->header.frame_id; 
-        
-        inflate_map_pub_.publish(inflate_msg);
-
         ROS_WARN("Map Initialized !!!");
     }
 }
