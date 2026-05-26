@@ -6,9 +6,7 @@ Panels:
       Expanded:
         - /Drone1
         - /Map1
-        - /Map1/GlobalMap1
         - /Map1/GlobalMap1/Autocompute Value Bounds1
-        - /Map1/LocalInflateMap1
         - /Optimal traj1
         - /Waypoints1
         - /Path1/Namespaces1
@@ -161,7 +159,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 2.119999885559082
+            Max Value: 5.71999979019165
             Min Value: -0.20000000298023224
             Value: true
           Axis: Z
@@ -193,7 +191,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        {}
+        trajectory: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -201,7 +199,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/waypoints
       Name: Waypoints
       Namespaces:
-        {}
+        waypoints: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -240,25 +238,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 58.429386138916016
+      Distance: 8.395423889160156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.191769599914551
-        Y: -9.51070785522461
+        X: 10.918302536010742
+        Y: -5.8690900802612305
         Z: 1.1862058639526367
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7447972297668457
+      Pitch: 1.399796485900879
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.716567516326904
+      Yaw: 4.791569709777832
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 4.048277378082275
