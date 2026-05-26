@@ -1,5 +1,6 @@
 #include "fsto/glbmap.h"
 #include <sensor_msgs/point_cloud2_iterator.h>
+#include <limits>
 
 using namespace std;
 using namespace Eigen;
@@ -90,127 +91,6 @@ bool BinaryGridField::queryOccupied(const Eigen::Vector3d &pos) const
     }
 }
 
-
-GridMap::GridMap(const Config &conf)
-    : config(conf), gridPtr(nullptr)
-{
-}
-
-GridMap::~GridMap()
-{
-    if (gridPtr != nullptr)
-    {
-        delete gridPtr;
-    }
-}
-
-// 使用点云数据PointCloud2 来构建二值膨胀地图
-void GridMap::initialize(const sensor_msgs::PointCloud2::ConstPtr &msg)
-{
-    // ====== 修改点：为网格数组增加 Padding，防止边界处的膨胀被截断 ======
-    // 预留的额外空间：无人机半径 + 0.5米余量
-    double pad = config.bodySafeRadius + 0.5; 
-
-    // 网格的物理长宽高都需要加上两侧的 pad
-    Vector3i xyz((config.r3Bound[1] - config.r3Bound[0] + 2.0 * pad) / config.edfResolution,
-                 (config.r3Bound[3] - config.r3Bound[2] + 2.0 * pad) / config.edfResolution,
-                 (config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);   
-
-    // 地图的原点偏移向负方向后退 pad
-    Vector3d offset(config.r3Bound[0] - pad, 
-                    config.r3Bound[2] - pad, 
-                    config.r3Bound[4] - pad);  
-    // ================================================================ 
-
-    if (gridPtr != nullptr) {
-        delete gridPtr;
-    }
-    gridPtr = new BinaryGridField(xyz, offset, config.edfResolution);
-
-    size_t cur = 0;
-    size_t total = msg->data.size() / msg->point_step;
-    float *fdata = (float *)(&msg->data[0]);
-    Vector3d tempVec;
-    
-    // 读入原始障碍物点
-    for (size_t i = 0; i < total; i++)
-    {
-        cur = msg->point_step / sizeof(float) * i;
-
-        if (isnan(fdata[cur + 0]) || isinf(fdata[cur + 0]) ||
-            isnan(fdata[cur + 1]) || isinf(fdata[cur + 1]) ||
-            isnan(fdata[cur + 2]) || isinf(fdata[cur + 2]))
-        {
-            continue;
-        }
-        tempVec << config.unitScaleInSI * fdata[cur + 0],
-                   config.unitScaleInSI * fdata[cur + 1],
-                   config.unitScaleInSI * fdata[cur + 2];
-        gridPtr->setOccupied(tempVec);
-    }
-    
-    // 调用二值地图膨胀，以无人机安全半径膨胀
-    // gridPtr->inflateObstacles(config.bodySafeRadius);
-}
-
-void GridMap::buildLocalMapFromGlobal(const GridMap &globalMap,
-                                        const Eigen::Vector3d &center,
-                                        double radius)
-{
-    double pad = config.bodySafeRadius + config.edfResolution;
-    double map_radius = radius + pad;
-
-    Eigen::Vector3i xyz;
-    xyz << std::ceil(2.0 * map_radius / config.edfResolution),
-           std::ceil(2.0 * map_radius / config.edfResolution),
-           std::ceil((config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);
-
-    Eigen::Vector3d offset;
-    offset << center(0) - map_radius,
-              center(1) - map_radius,
-              config.r3Bound[4] - pad;
-
-    if (gridPtr != nullptr)
-    {
-        delete gridPtr;
-        gridPtr = nullptr;
-    }
-
-    gridPtr = new BinaryGridField(xyz, offset, config.edfResolution);
-
-    std::vector<Eigen::Vector3d> local_obs;
-    globalMap.getOccupiedPointsInRadius(local_obs, center, radius);
-
-    for (const auto &p : local_obs)
-    {
-        gridPtr->setOccupied(p);
-    }
-
-    gridPtr->inflateObstacles(config.bodySafeRadius);
-
-    mapCenter = center;
-    visibleRadius = radius;
-    isLocalMap = true;
-}
-
-bool GridMap::safeQuery(const Eigen::Vector3d &p, double safeRadius) const
-{
-    if (gridPtr == nullptr)
-    {
-        return true;
-    }
-
-    if (isLocalMap)
-    {
-        if ((p - mapCenter).norm() > visibleRadius)
-        {
-            return true;
-        }
-    }
-
-    return !gridPtr->queryOccupied(p);
-}
-
 void BinaryGridField::getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
 {
     // 1. 将无人机的物理坐标转换为网格索引
@@ -285,26 +165,6 @@ void BinaryGridField::getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Ei
     }
 }
 
-void GridMap::publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
-{
-    if (gridPtr != nullptr) {
-        gridPtr->getLocalPointCloud(msg, pos, radius);
-    }
-}
-
-void GridMap::getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
-                                        const Eigen::Vector3d &center,
-                                        double radius) const
-{
-    if (gridPtr == nullptr)
-    {
-        pts.clear();
-        return;
-    }
-
-    gridPtr->getOccupiedPointsInRadius(pts, center, radius);
-}
-
 void BinaryGridField::getOccupiedPointsInRadius(
     std::vector<Eigen::Vector3d> &pts,
     const Eigen::Vector3d &center,
@@ -338,3 +198,156 @@ void BinaryGridField::getOccupiedPointsInRadius(
         }
     }
 }
+
+PriorGlobalMap::PriorGlobalMap(const Config &conf)
+    : config(conf),
+      globalGridPtr(nullptr)
+{
+}
+
+PriorGlobalMap::~PriorGlobalMap()
+{
+    if (globalGridPtr != nullptr)
+    {
+        delete globalGridPtr;
+    }
+}
+
+void PriorGlobalMap::initialize(const sensor_msgs::PointCloud2::ConstPtr &msg)
+{
+    // ====== 修改点：为网格数组增加 Padding，防止边界处的膨胀被截断 ======
+    // 预留的额外空间：无人机半径 + 0.5米余量
+    double pad = config.bodySafeRadius + 0.5; 
+
+    // 网格的物理长宽高都需要加上两侧的 pad
+    Vector3i xyz((config.r3Bound[1] - config.r3Bound[0] + 2.0 * pad) / config.edfResolution,
+                 (config.r3Bound[3] - config.r3Bound[2] + 2.0 * pad) / config.edfResolution,
+                 (config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);   
+
+    // 地图的原点偏移向负方向后退 pad
+    Vector3d offset(config.r3Bound[0] - pad, 
+                    config.r3Bound[2] - pad, 
+                    config.r3Bound[4] - pad);  
+    // ================================================================ 
+
+    if (globalGridPtr != nullptr) {
+        delete globalGridPtr;
+    }
+    globalGridPtr = new BinaryGridField(xyz, offset, config.edfResolution);
+
+    size_t cur = 0;
+    size_t total = msg->data.size() / msg->point_step;
+    float *fdata = (float *)(&msg->data[0]);
+    Vector3d tempVec;
+    
+    // 读入原始障碍物点
+    for (size_t i = 0; i < total; i++)
+    {
+        cur = msg->point_step / sizeof(float) * i;
+
+        if (isnan(fdata[cur + 0]) || isinf(fdata[cur + 0]) ||
+            isnan(fdata[cur + 1]) || isinf(fdata[cur + 1]) ||
+            isnan(fdata[cur + 2]) || isinf(fdata[cur + 2]))
+        {
+            continue;
+        }
+        tempVec << config.unitScaleInSI * fdata[cur + 0],
+                   config.unitScaleInSI * fdata[cur + 1],
+                   config.unitScaleInSI * fdata[cur + 2];
+        globalGridPtr->setOccupied(tempVec);
+    }
+}
+
+void PriorGlobalMap::getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
+                                        const Eigen::Vector3d &center,
+                                        double radius) const
+{
+    if (globalGridPtr == nullptr)
+    {
+        pts.clear();
+        return;
+    }
+
+    globalGridPtr->getOccupiedPointsInRadius(pts, center, radius);
+}
+
+
+LocalPerceptionMap::LocalPerceptionMap(const Config &conf)
+    : config(conf),
+      localGridPtr(nullptr)
+{
+}
+
+LocalPerceptionMap::~LocalPerceptionMap()
+{
+    if (localGridPtr != nullptr)
+    {
+        delete localGridPtr;
+    }
+}
+
+void LocalPerceptionMap::buildLocalMapFromGlobal(const PriorGlobalMap &globalMap,
+                                        const Eigen::Vector3d &center,
+                                        double radius)
+{
+    double pad = config.bodySafeRadius + config.edfResolution;
+    double map_radius = radius + pad;
+
+    Eigen::Vector3i xyz;
+    xyz << std::ceil(2.0 * map_radius / config.edfResolution),
+           std::ceil(2.0 * map_radius / config.edfResolution),
+           std::ceil((config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);
+
+    Eigen::Vector3d offset;
+    offset << center(0) - map_radius,
+              center(1) - map_radius,
+              config.r3Bound[4] - pad;
+
+    if (localGridPtr != nullptr)
+    {
+        delete localGridPtr;
+        localGridPtr = nullptr;
+    }
+
+    localGridPtr = new BinaryGridField(xyz, offset, config.edfResolution);
+
+    std::vector<Eigen::Vector3d> local_obs;
+    globalMap.getOccupiedPointsInRadius(local_obs, center, radius);
+
+    for (const auto &p : local_obs)
+    {
+        localGridPtr->setOccupied(p);
+    }
+
+    localGridPtr->inflateObstacles(config.bodySafeRadius);
+
+    mapCenter = center;
+    visibleRadius = radius;
+}
+
+bool LocalPerceptionMap::safeQuery(const Eigen::Vector3d &p, double safeRadius) const
+{
+    if (localGridPtr == nullptr)
+    {
+        return true;
+    }
+
+    if ((p - mapCenter).norm() > visibleRadius)
+    {
+        return true;
+    }
+    
+
+    return !localGridPtr->queryOccupied(p);
+}
+
+
+void LocalPerceptionMap::getLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
+{
+    if (localGridPtr != nullptr) {
+        localGridPtr->getLocalPointCloud(msg, pos, radius);
+    }
+}
+
+
+

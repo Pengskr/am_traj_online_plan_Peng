@@ -11,7 +11,6 @@
 
 #include <Eigen/Eigen>
 
-// 替换掉原有的 EuclidDistField
 class BinaryGridField
 {
 public:
@@ -37,31 +36,40 @@ private:
     size_t stepX, stepY, stepZ;
 };
 
-class GridMap
+
+class PriorGlobalMap
 {
 public:
-    GridMap(const Config &conf);
-    ~GridMap();
-
+    PriorGlobalMap(const Config &conf);
+    ~PriorGlobalMap();
     void initialize(const sensor_msgs::PointCloud2::ConstPtr &msg);
-    void buildLocalMapFromGlobal(const GridMap &globalMap,
-                                 const Eigen::Vector3d &center,
-                                 double radius);
-    void publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg,
-                                 const Eigen::Vector3d &pos,
-                                 double radius) const;
     void getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
-                                          const Eigen::Vector3d &center,
-                                          double radius) const;                                 
-    bool safeQuery(const Eigen::Vector3d &p, double safeRadius) const;
-
+                                   const Eigen::Vector3d &center,
+                                   double radius) const;
 
 private:
     Config config;
-    BinaryGridField *gridPtr; // 将 edfPtr 替换为 gridPtr
+    BinaryGridField *globalGridPtr;
+};
+
+class LocalPerceptionMap
+{
+public:
+    LocalPerceptionMap(const Config &conf);
+    ~LocalPerceptionMap();
+    void buildLocalMapFromGlobal(const PriorGlobalMap &globalMap,
+                                 const Eigen::Vector3d &center,
+                                 double radius);
+    bool safeQuery(const Eigen::Vector3d &p, double safeRadius) const;
+    void getLocalInflatedMap(sensor_msgs::PointCloud2 &msg,
+                                 const Eigen::Vector3d &pos,
+                                 double radius) const;
+
+private:
+    Config config;
+    BinaryGridField *localGridPtr;
     Eigen::Vector3d mapCenter;
     double visibleRadius;
-    bool isLocalMap;
 };
 
 #endif

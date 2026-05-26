@@ -8,8 +8,8 @@
 using namespace std;
 using namespace Eigen;
 
-TrajGen::TrajGen(const Config &conf, std::shared_ptr<const GlobalMap> mapPtr)
-    : config(conf), glbMapPtr(mapPtr),
+TrajGen::TrajGen(const Config &conf, std::shared_ptr<const LocalPerceptionMap> mapPtr)
+    : config(conf), MapPtr(mapPtr),
       trajOpt(config.weightT, config.weightAcc, config.weightJerk,
               config.maxVelRate, config.maxAccRate, config.iterations, config.epsilon)
 {
@@ -117,7 +117,7 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d>
         {
             t += config.temporalResolution;
             tempTranslation = traj[i].getPos(t);
-            tempSafe = glbMapPtr->safeQuery(tempTranslation, config.bodySafeRadius);
+            tempSafe = MapPtr->safeQuery(tempTranslation, config.bodySafeRadius);
             safe &= tempSafe;
             if (!tempSafe)
             {

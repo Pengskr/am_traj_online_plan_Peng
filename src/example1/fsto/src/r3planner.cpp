@@ -5,8 +5,8 @@ using namespace Eigen;
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-R3Planner::R3Planner(const Config &conf, std::shared_ptr<const GlobalMap> mapPtr)
-    : config(conf), glbMapPtr(mapPtr)
+R3Planner::R3Planner(const Config &conf, std::shared_ptr<const LocalPerceptionMap> mapPtr)
+    : config(conf), MapPtr(mapPtr)
 {
 }
 
@@ -28,7 +28,7 @@ double R3Planner::plan(const Vector3d &s, const Vector3d &g, vector<Vector3d> &p
         [&](const ob::State *state) {
             const auto *pos = state->as<ob::RealVectorStateSpace::StateType>();
             Vector3d position((*pos)[0], (*pos)[1], (*pos)[2]);
-            return this->glbMapPtr->safeQuery(position, config.r3SafeRadius);
+            return this->MapPtr->safeQuery(position, config.r3SafeRadius);
         });
     si->setup();
 

@@ -55,9 +55,10 @@ public:
     Eigen::Vector3d curOdomAcc;
     bool accInitialized;
     bool mapInitialized;
+    bool localMapInitialized;
 
-    std::shared_ptr<GridMap> glbMapPtr;    // 先验全局地图
-    std::shared_ptr<GridMap> localMapPtr;  // 当前局部感知地图
+    std::shared_ptr<PriorGlobalMap> glbMapPtr;    // 先验全局地图
+    std::shared_ptr<LocalPerceptionMap> localMapPtr;  // 当前局部感知地图
     R3Planner r3planner;
     TrajGen trajGen;
     Visualization visualization;

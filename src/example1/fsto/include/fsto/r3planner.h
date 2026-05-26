@@ -15,13 +15,13 @@
 class R3Planner
 {
 public:
-    R3Planner(const Config &conf, std::shared_ptr<const GlobalMap> mapPtr);
+    R3Planner(const Config &conf, std::shared_ptr<const LocalPerceptionMap> mapPtr);
     double plan(const Eigen::Vector3d &s, const Eigen::Vector3d &g, std::vector<Eigen::Vector3d> &p, double timeout) const;
     double planOnce(const Eigen::Vector3d &s, const Eigen::Vector3d &g, std::vector<Eigen::Vector3d> &p) const;
 
 private:
     Config config;
-    std::shared_ptr<const GlobalMap> glbMapPtr;
+    std::shared_ptr<const LocalPerceptionMap> MapPtr;
 };
 
 #endif

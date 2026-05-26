@@ -25,7 +25,7 @@ public:
 class TrajGen
 {
 public:
-    TrajGen(const Config &conf, std::shared_ptr<const GlobalMap> mapPtr);
+    TrajGen(const Config &conf, std::shared_ptr<const LocalPerceptionMap> mapPtr);
     Trajectory generate(std::vector<Eigen::Vector3d> &route,
                         Eigen::Vector3d initialVel,
                         Eigen::Vector3d initialAcc,
@@ -36,7 +36,7 @@ public:
 
 public:
     Config config;
-    std::shared_ptr<const GlobalMap> glbMapPtr;
+    std::shared_ptr<const LocalPerceptionMap> MapPtr;
     AmTraj trajOpt;
 
     bool trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d> &route) const;

@@ -6,9 +6,9 @@ using namespace Eigen;
 
 MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
     : config(conf), nh(nh_), odomInitialized(false),
-      accInitialized(false), mapInitialized(false),
-      glbMapPtr(make_shared<GridMap>(config)),
-      localMapPtr(make_shared<GridMap>(config)),
+      accInitialized(false), mapInitialized(false),localMapInitialized(false),
+      glbMapPtr(make_shared<PriorGlobalMap>(config)),
+      localMapPtr(make_shared<LocalPerceptionMap>(config)),
       r3planner(config, localMapPtr),
       trajGen(config, localMapPtr),
       visualization(config, nh)
@@ -55,11 +55,12 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
         localMapPtr->buildLocalMapFromGlobal(*glbMapPtr,
                                              current_pos,
                                              config.sensingRadius);
+        localMapInitialized = true;
 
         sensor_msgs::PointCloud2 inflate_msg;
-        localMapPtr->publishLocalInflatedMap(inflate_msg,
-                                             current_pos,
-                                             config.sensingRadius);
+        localMapPtr->getLocalInflatedMap(inflate_msg,
+                                         current_pos,
+                                         config.sensingRadius);
 
         inflate_msg.header.stamp = msg->header.stamp;
         inflate_msg.header.frame_id = config.odomFrame;
@@ -99,7 +100,7 @@ void MavGlobalPlanner::mapCallBack(const sensor_msgs::PointCloud2::ConstPtr &msg
 
 void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
-    if (mapInitialized)
+    if (mapInitialized && localMapInitialized)
     {
         Vector3d s(curOdomPose.translation());  // 根据里程计获取当前位置
         double zGoal = fabs(msg->pose.orientation.z) * (config.r3Bound[5] - config.r3Bound[4] - 2 * config.r3SafeRadius) +
@@ -159,6 +160,7 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
             }
         }
     }
+    else ROS_WARN("Waiting for global map and local map.");
 }
 
 void MavGlobalPlanner::trajTriggerCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
