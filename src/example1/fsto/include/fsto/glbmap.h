@@ -16,22 +16,31 @@ class BinaryGridField
 public:
     BinaryGridField(Eigen::Vector3i xyz, Eigen::Vector3d offset, double scale);
     ~BinaryGridField();
+
     BinaryGridField(const BinaryGridField &) = delete;
+    BinaryGridField &operator=(const BinaryGridField &) = delete;
 
     void setOccupied(const Eigen::Vector3d &pos);
-    void inflateObstacles(double inflateRadius); // 障碍物膨胀
-    bool queryOccupied(const Eigen::Vector3d &pos) const; // 查询是否被占据
-    void getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
+
+    void setOccupiedAndInflate(const std::vector<Eigen::Vector3d> &obsPts,
+                               double inflateRadius);
+
+    bool queryOccupied(const Eigen::Vector3d &pos) const;
+
+    void getLocalPointCloud(sensor_msgs::PointCloud2 &msg,
+                            const Eigen::Vector3d &pos,
+                            double radius) const;
+
     void getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
-                                const Eigen::Vector3d &center,
-                                double radius) const;
+                                   const Eigen::Vector3d &center,
+                                   double radius) const;
 
 private:
     Eigen::Vector3i sizeXYZ;
     Eigen::Vector3d originVec;
     double linearScale;
 
-    bool *occupancyPtr; // 二值占据数组
+    bool *occupancyPtr;
 
     size_t stepX, stepY, stepZ;
 };

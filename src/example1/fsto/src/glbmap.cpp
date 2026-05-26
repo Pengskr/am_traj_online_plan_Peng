@@ -1,6 +1,7 @@
 #include "fsto/glbmap.h"
 #include <sensor_msgs/point_cloud2_iterator.h>
 #include <limits>
+#include <unordered_set>
 
 using namespace std;
 using namespace Eigen;
@@ -33,41 +34,76 @@ void BinaryGridField::setOccupied(const Eigen::Vector3d &pos)
     }
 }
 
-void BinaryGridField::inflateObstacles(double inflateRadius)
+void BinaryGridField::setOccupiedAndInflate(
+    const std::vector<Eigen::Vector3d> &obsPts,
+    double inflateRadius)
 {
-    int radiusInVoxels = std::ceil(inflateRadius / linearScale);
-    double sqrRadius = inflateRadius * inflateRadius;
+    if (occupancyPtr == nullptr)
+    {
+        return;
+    }
 
-    // 1. 收集初始原始障碍物体素的索引，防止在膨胀过程中边膨胀边读取，造成无限制蔓延
-    std::vector<Eigen::Vector3i> obsVoxels;
-    for (int x = 0; x < sizeXYZ(0); x++) {
-        for (int y = 0; y < sizeXYZ(1); y++) {
-            for (int z = 0; z < sizeXYZ(2); z++) {
-                if (occupancyPtr[x + y * stepY + z * stepZ]) {
-                    obsVoxels.emplace_back(x, y, z);
-                }
-            }
+    const int radiusInVoxels = std::ceil(inflateRadius / linearScale);
+    const double sqrInflateRadius = inflateRadius * inflateRadius;
+
+    std::vector<Eigen::Vector3i> seedVoxels;
+    seedVoxels.reserve(obsPts.size());
+
+    std::unordered_set<size_t> seedAddresses;
+    seedAddresses.reserve(obsPts.size() * 2 + 1);
+
+    // 1. 将感知范围内的障碍物点转为局部地图中的 occupied seed voxel
+    for (const auto &pos : obsPts)
+    {
+        int ix = std::floor((pos(0) - originVec(0)) / linearScale);
+        int iy = std::floor((pos(1) - originVec(1)) / linearScale);
+        int iz = std::floor((pos(2) - originVec(2)) / linearScale);
+
+        if (ix < 0 || iy < 0 || iz < 0 ||
+            ix >= sizeXYZ(0) || iy >= sizeXYZ(1) || iz >= sizeXYZ(2))
+        {
+            continue;
+        }
+
+        const size_t adr = ix + iy * stepY + iz * stepZ;
+
+        // 同一个体素可能包含多个点云点，只保留一个 seed
+        if (seedAddresses.insert(adr).second)
+        {
+            occupancyPtr[adr] = true;
+            seedVoxels.emplace_back(ix, iy, iz);
         }
     }
 
-    // 2. 对每个障碍物体素进行球形邻域膨胀
-    for (const auto& v : obsVoxels) {
-        for (int dx = -radiusInVoxels; dx <= radiusInVoxels; dx++) {
-            for (int dy = -radiusInVoxels; dy <= radiusInVoxels; dy++) {
-                for (int dz = -radiusInVoxels; dz <= radiusInVoxels; dz++) {
-                    int nx = v(0) + dx;
-                    int ny = v(1) + dy;
-                    int nz = v(2) + dz;
+    // 2. 只围绕 seed voxel 做球形膨胀，不再扫描整个局部地图
+    for (const auto &v : seedVoxels)
+    {
+        for (int dx = -radiusInVoxels; dx <= radiusInVoxels; ++dx)
+        {
+            for (int dy = -radiusInVoxels; dy <= radiusInVoxels; ++dy)
+            {
+                for (int dz = -radiusInVoxels; dz <= radiusInVoxels; ++dz)
+                {
+                    const double distSqr =
+                        static_cast<double>(dx * dx + dy * dy + dz * dz) *
+                        linearScale * linearScale;
 
-                    // 越界检查
-                    if (nx < 0 || ny < 0 || nz < 0 || nx >= sizeXYZ(0) || ny >= sizeXYZ(1) || nz >= sizeXYZ(2)) 
+                    if (distSqr > sqrInflateRadius)
+                    {
                         continue;
-
-                    // 距离检查 (球形膨胀)
-                    double distSqr = (dx*dx + dy*dy + dz*dz) * linearScale * linearScale;
-                    if (distSqr <= sqrRadius) {
-                        occupancyPtr[nx + ny * stepY + nz * stepZ] = true;
                     }
+
+                    const int nx = v(0) + dx;
+                    const int ny = v(1) + dy;
+                    const int nz = v(2) + dz;
+
+                    if (nx < 0 || ny < 0 || nz < 0 ||
+                        nx >= sizeXYZ(0) || ny >= sizeXYZ(1) || nz >= sizeXYZ(2))
+                    {
+                        continue;
+                    }
+
+                    occupancyPtr[nx + ny * stepY + nz * stepZ] = true;
                 }
             }
         }
@@ -302,17 +338,19 @@ LocalPerceptionMap::~LocalPerceptionMap()
     }
 }
 
-void LocalPerceptionMap::buildLocalMapFromGlobal(const PriorGlobalMap &globalMap,
-                                        const Eigen::Vector3d &center,
-                                        double radius)
+void LocalPerceptionMap::buildLocalMapFromGlobal(
+    const PriorGlobalMap &globalMap,
+    const Eigen::Vector3d &center,
+    double radius)
 {
-    double pad = config.bodySafeRadius + config.edfResolution;
-    double map_radius = radius + pad;
+    const double pad = config.bodySafeRadius + config.edfResolution;
+    const double map_radius = radius + pad;
 
     Eigen::Vector3i xyz;
     xyz << std::ceil(2.0 * map_radius / config.edfResolution),
            std::ceil(2.0 * map_radius / config.edfResolution),
-           std::ceil((config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);
+           std::ceil((config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) /
+                     config.edfResolution);
 
     Eigen::Vector3d offset;
     offset << center(0) - map_radius,
@@ -330,12 +368,7 @@ void LocalPerceptionMap::buildLocalMapFromGlobal(const PriorGlobalMap &globalMap
     std::vector<Eigen::Vector3d> local_obs;
     globalMap.getOccupiedPointsInRadius(local_obs, center, radius);
 
-    for (const auto &p : local_obs)
-    {
-        localGridPtr->setOccupied(p);
-    }
-
-    localGridPtr->inflateObstacles(config.bodySafeRadius);
+    localGridPtr->setOccupiedAndInflate(local_obs, config.bodySafeRadius);
 
     mapCenter = center;
     visibleRadius = radius;
