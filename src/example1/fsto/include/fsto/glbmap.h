@@ -23,7 +23,9 @@ public:
     void inflateObstacles(double inflateRadius); // 障碍物膨胀
     bool queryOccupied(const Eigen::Vector3d &pos) const; // 查询是否被占据
     void getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
-    void raycastFree(const Eigen::Vector3d &start, const Eigen::Vector3d &end);
+    void getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
+                                const Eigen::Vector3d &center,
+                                double radius) const;
 
 private:
     Eigen::Vector3i sizeXYZ;
@@ -35,18 +37,31 @@ private:
     size_t stepX, stepY, stepZ;
 };
 
-class GlobalMap
+class GridMap
 {
 public:
-    GlobalMap(const Config &conf);
-    ~GlobalMap();
+    GridMap(const Config &conf);
+    ~GridMap();
+
     void initialize(const sensor_msgs::PointCloud2::ConstPtr &msg);
+    void buildLocalMapFromGlobal(const GridMap &globalMap,
+                                 const Eigen::Vector3d &center,
+                                 double radius);
+    void publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg,
+                                 const Eigen::Vector3d &pos,
+                                 double radius) const;
+    void getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts,
+                                          const Eigen::Vector3d &center,
+                                          double radius) const;                                 
     bool safeQuery(const Eigen::Vector3d &p, double safeRadius) const;
-    void publishLocalInflatedMap(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const;
+
 
 private:
     Config config;
     BinaryGridField *gridPtr; // 将 edfPtr 替换为 gridPtr
+    Eigen::Vector3d mapCenter;
+    double visibleRadius;
+    bool isLocalMap;
 };
 
 #endif

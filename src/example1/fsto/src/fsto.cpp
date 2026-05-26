@@ -7,8 +7,10 @@ using namespace Eigen;
 MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
     : config(conf), nh(nh_), odomInitialized(false),
       accInitialized(false), mapInitialized(false),
-      glbMapPtr(make_shared<GlobalMap>(config)),
-      r3planner(config, glbMapPtr), trajGen(config, glbMapPtr),
+      glbMapPtr(make_shared<GridMap>(config)),
+      localMapPtr(make_shared<GridMap>(config)),
+      r3planner(config, localMapPtr),
+      trajGen(config, localMapPtr),
       visualization(config, nh)
 {
     odomSub = nh.subscribe(config.odomTopic, 3, &MavGlobalPlanner::odomCallBack,
@@ -40,28 +42,30 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
     curOdomPose = tranOdomBody * quatOdomBody;
     curOdomVel = Vector3d(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
     odomStamp = Time::now();
-
     odomInitialized = true;
 
-    // ======= 新增：降频发布局部感知膨胀地图 =======
-    static ros::Time last_pub_time = ros::Time::now();
-    if ((msg->header.stamp - last_pub_time).toSec() > 0.1) // 限制发布频率为 10Hz
+    // ======= 降频更新与发布局部感知膨胀地图 =======
+    static ros::Time last_local_map_update_time = ros::Time(0);
+    double local_map_update_dt = 0.10;
+
+    if (mapInitialized && (msg->header.stamp - last_local_map_update_time).toSec() > local_map_update_dt)
     {
-        if (glbMapPtr != nullptr) 
-        {
-            sensor_msgs::PointCloud2 inflate_msg;
-            
-            Eigen::Vector3d current_pos(msg->pose.pose.position.x, 
-                                        msg->pose.pose.position.y, 
-                                        msg->pose.pose.position.z);
-            
-            glbMapPtr->publishLocalInflatedMap(inflate_msg, current_pos, config.sensingRadius); 
-            
-            inflate_msg.header.stamp = msg->header.stamp;
-            inflate_msg.header.frame_id = config.odomFrame;
-            inflate_map_pub.publish(inflate_msg);
-        }
-        last_pub_time = msg->header.stamp;
+        Eigen::Vector3d current_pos = curOdomPose.translation();
+
+        localMapPtr->buildLocalMapFromGlobal(*glbMapPtr,
+                                             current_pos,
+                                             config.sensingRadius);
+
+        sensor_msgs::PointCloud2 inflate_msg;
+        localMapPtr->publishLocalInflatedMap(inflate_msg,
+                                             current_pos,
+                                             config.sensingRadius);
+
+        inflate_msg.header.stamp = msg->header.stamp;
+        inflate_msg.header.frame_id = config.odomFrame;
+        inflate_map_pub.publish(inflate_msg);
+
+        last_local_map_update_time = msg->header.stamp;
     }
     // ============================================
 }
