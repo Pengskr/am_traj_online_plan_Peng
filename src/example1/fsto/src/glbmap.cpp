@@ -1,177 +1,138 @@
 #include "fsto/glbmap.h"
+#include <sensor_msgs/point_cloud2_iterator.h>
 
 using namespace std;
 using namespace Eigen;
 
-EuclidDistField::EuclidDistField(Vector3i xyz, Vector3d offset, double scale)
-    : sizeXYZ(xyz), originVec(offset), linearScale(scale), sqrDistsPtr(nullptr),
-      stepX(1), stepY(sizeXYZ(0)), stepZ(size_t(sizeXYZ(1)) * sizeXYZ(0)),
-      linearScaleSqr(linearScale * linearScale)
+BinaryGridField::BinaryGridField(Vector3i xyz, Vector3d offset, double scale)
+    : sizeXYZ(xyz), originVec(offset), linearScale(scale), occupancyPtr(nullptr),
+      stepX(1), stepY(sizeXYZ(0)), stepZ(size_t(sizeXYZ(1)) * sizeXYZ(0))
 {
     size_t total = size_t(sizeXYZ(0)) * sizeXYZ(1) * sizeXYZ(2);
-    double infDBL = INFINITY;
-    sqrDistsPtr = new double[total];
-    std::fill_n(sqrDistsPtr, total, infDBL);
+    occupancyPtr = new bool[total];
+    std::fill_n(occupancyPtr, total, false); // 默认全为 free (false)
 }
 
-EuclidDistField::~EuclidDistField()
+BinaryGridField::~BinaryGridField()
 {
-    if (sqrDistsPtr != nullptr)
+    if (occupancyPtr != nullptr)
     {
-        delete[] sqrDistsPtr;
+        delete[] occupancyPtr;
     }
 }
 
-void EuclidDistField::setOccupied(const Eigen::Vector3d &pos)
+void BinaryGridField::setOccupied(const Eigen::Vector3d &pos)
 {
     int tempXi = (pos(0) - originVec(0)) / linearScale;
     int tempYi = (pos(1) - originVec(1)) / linearScale;
     int tempZi = (pos(2) - originVec(2)) / linearScale;
     if (!(tempXi < 0 || tempYi < 0 || tempZi < 0 || tempXi >= sizeXYZ(0) || tempYi >= sizeXYZ(1) || tempZi >= sizeXYZ(2)))
     {
-        sqrDistsPtr[tempXi + tempYi * stepY + tempZi * stepZ] = 0.0;
+        occupancyPtr[tempXi + tempYi * stepY + tempZi * stepZ] = true;
     }
 }
 
-double EuclidDistField::queryDistSqr(const Eigen::Vector3d &pos) const
+void BinaryGridField::inflateObstacles(double inflateRadius)
+{
+    int radiusInVoxels = std::ceil(inflateRadius / linearScale);
+    double sqrRadius = inflateRadius * inflateRadius;
+
+    // 1. 收集初始原始障碍物体素的索引，防止在膨胀过程中边膨胀边读取，造成无限制蔓延
+    std::vector<Eigen::Vector3i> obsVoxels;
+    for (int x = 0; x < sizeXYZ(0); x++) {
+        for (int y = 0; y < sizeXYZ(1); y++) {
+            for (int z = 0; z < sizeXYZ(2); z++) {
+                if (occupancyPtr[x + y * stepY + z * stepZ]) {
+                    obsVoxels.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+
+    // 2. 对每个障碍物体素进行球形邻域膨胀
+    for (const auto& v : obsVoxels) {
+        for (int dx = -radiusInVoxels; dx <= radiusInVoxels; dx++) {
+            for (int dy = -radiusInVoxels; dy <= radiusInVoxels; dy++) {
+                for (int dz = -radiusInVoxels; dz <= radiusInVoxels; dz++) {
+                    int nx = v(0) + dx;
+                    int ny = v(1) + dy;
+                    int nz = v(2) + dz;
+
+                    // 越界检查
+                    if (nx < 0 || ny < 0 || nz < 0 || nx >= sizeXYZ(0) || ny >= sizeXYZ(1) || nz >= sizeXYZ(2)) 
+                        continue;
+
+                    // 距离检查 (球形膨胀)
+                    double distSqr = (dx*dx + dy*dy + dz*dz) * linearScale * linearScale;
+                    if (distSqr <= sqrRadius) {
+                        occupancyPtr[nx + ny * stepY + nz * stepZ] = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool BinaryGridField::queryOccupied(const Eigen::Vector3d &pos) const
 {
     int tempXi = (pos(0) - originVec(0)) / linearScale;
     int tempYi = (pos(1) - originVec(1)) / linearScale;
     int tempZi = (pos(2) - originVec(2)) / linearScale;
+    
+    // 如果查询点超出地图范围，默认视为不安全（被占据）
     if (tempXi < 0 || tempYi < 0 || tempZi < 0 || tempXi >= sizeXYZ(0) || tempYi >= sizeXYZ(1) || tempZi >= sizeXYZ(2))
     {
-        return 0.0;
+        return true; 
     }
     else
     {
-        return sqrDistsPtr[tempXi + tempYi * stepY + tempZi * stepZ];
+        return occupancyPtr[tempXi + tempYi * stepY + tempZi * stepZ];
     }
 }
 
-double EuclidDistField::queryDist(const Eigen::Vector3d &pos) const
-{
-    return sqrt(queryDistSqr(pos));
-}
-
-void EuclidDistField::updateLinearEDF(double *p, size_t step, size_t N, double sqrLinearScale) const
-{
-    size_t *v = new size_t[N];
-    double *z = new double[N + 1];
-
-    v[0] = 0;
-    z[0] = -INFINITY;
-    z[1] = INFINITY;
-    size_t k = 0;
-    for (size_t q = 1; q < N; q++)
-    {
-        k++;
-        double s;
-        double tempfq, tempfr;
-        do
-        {
-            k--;
-
-            tempfq = p[q * step] / sqrLinearScale;
-            tempfr = p[v[k] * step] / sqrLinearScale;
-
-            if (isinf(tempfq))
-            {
-                s = INFINITY;
-            }
-            else if (isinf(tempfr))
-            {
-                s = -INFINITY;
-            }
-            else
-            {
-                s = ((tempfq + q * q) - (tempfr + v[k] * v[k])) / (2.0 * q - 2.0 * v[k]);
-            }
-
-        } while (s <= z[k] && k > 0);
-
-        k++;
-        v[k] = q;
-        z[k] = s;
-        z[k + 1] = INFINITY;
-    }
-
-    k = 0;
-    for (size_t q = 0; q < N; q++)
-    {
-        while (z[k + 1] < q)
-        {
-            k++;
-        }
-        if (q != v[k])
-        {
-            p[q * step] = (q * 1.0 - v[k]) * (q * 1.0 - v[k]) * sqrLinearScale + p[v[k] * step];
-        }
-    }
-
-    delete[] z;
-    delete[] v;
-}
-
-void EuclidDistField::updateCubicEDF(void)
-{
-    size_t ini;
-
-    for (int y = 0; y < sizeXYZ(1); y++)
-    {
-        for (int z = 0; z < sizeXYZ(2); z++)
-        {
-            ini = y * stepY + z * stepZ;
-            updateLinearEDF(sqrDistsPtr + ini, stepX, sizeXYZ(0), linearScaleSqr);
-        }
-    }
-
-    for (int x = 0; x < sizeXYZ(0); x++)
-    {
-        for (int z = 0; z < sizeXYZ(2); z++)
-        {
-            ini = x * stepX + z * stepZ;
-            updateLinearEDF(sqrDistsPtr + ini, stepY, sizeXYZ(1), linearScaleSqr);
-        }
-    }
-
-    for (int x = 0; x < sizeXYZ(0); x++)
-    {
-        for (int y = 0; y < sizeXYZ(1); y++)
-        {
-            ini = x * stepX + y * stepY;
-            updateLinearEDF(sqrDistsPtr + ini, stepZ, sizeXYZ(2), linearScaleSqr);
-        }
-    }
-}
 
 GlobalMap::GlobalMap(const Config &conf)
-    : config(conf), edfPtr(nullptr)
+    : config(conf), gridPtr(nullptr)
 {
 }
 
 GlobalMap::~GlobalMap()
 {
-    if (edfPtr != nullptr)
+    if (gridPtr != nullptr)
     {
-        delete edfPtr;
+        delete gridPtr;
     }
 }
 
-// 使用点云数据PointCloud2 来构建一个欧几里得距离场 EDF
+// 使用点云数据PointCloud2 来构建二值膨胀地图
 void GlobalMap::initialize(const sensor_msgs::PointCloud2::ConstPtr &msg)
 {
-    Vector3i xyz((config.r3Bound[1] - config.r3Bound[0]) / config.edfResolution,
-                 (config.r3Bound[3] - config.r3Bound[2]) / config.edfResolution,
-                 (config.r3Bound[5] - config.r3Bound[4]) / config.edfResolution);   // 距离场在 X,Y,Z 三个方向上体素（voxel）数量
+    // ====== 修改点：为网格数组增加 Padding，防止边界处的膨胀被截断 ======
+    // 预留的额外空间：无人机半径 + 0.5米余量
+    double pad = config.bodySafeRadius + 0.5; 
 
-    Vector3d offset(config.r3Bound[0], config.r3Bound[2], config.r3Bound[4]);   // 定义距离场的原点，即地图的最小角坐标 (Xmin​,Ymin​,Zmin​)
+    // 网格的物理长宽高都需要加上两侧的 pad
+    Vector3i xyz((config.r3Bound[1] - config.r3Bound[0] + 2.0 * pad) / config.edfResolution,
+                 (config.r3Bound[3] - config.r3Bound[2] + 2.0 * pad) / config.edfResolution,
+                 (config.r3Bound[5] - config.r3Bound[4] + 2.0 * pad) / config.edfResolution);   
 
-    edfPtr = new EuclidDistField(xyz, offset, config.edfResolution);
+    // 地图的原点偏移向负方向后退 pad
+    Vector3d offset(config.r3Bound[0] - pad, 
+                    config.r3Bound[2] - pad, 
+                    config.r3Bound[4] - pad);  
+    // ================================================================ 
+
+    if (gridPtr != nullptr) {
+        delete gridPtr;
+    }
+    gridPtr = new BinaryGridField(xyz, offset, config.edfResolution);
 
     size_t cur = 0;
     size_t total = msg->data.size() / msg->point_step;
     float *fdata = (float *)(&msg->data[0]);
     Vector3d tempVec;
+    
+    // 读入原始障碍物点
     for (size_t i = 0; i < total; i++)
     {
         cur = msg->point_step / sizeof(float) * i;
@@ -183,14 +144,67 @@ void GlobalMap::initialize(const sensor_msgs::PointCloud2::ConstPtr &msg)
             continue;
         }
         tempVec << config.unitScaleInSI * fdata[cur + 0],
-            config.unitScaleInSI * fdata[cur + 1],
-            config.unitScaleInSI * fdata[cur + 2];
-        edfPtr->setOccupied(tempVec);
+                   config.unitScaleInSI * fdata[cur + 1],
+                   config.unitScaleInSI * fdata[cur + 2];
+        gridPtr->setOccupied(tempVec);
     }
-    edfPtr->updateCubicEDF();
+    
+    // 调用二值地图膨胀，以无人机安全半径膨胀
+    gridPtr->inflateObstacles(config.bodySafeRadius);
 }
 
 bool GlobalMap::safeQuery(const Vector3d &p, double safeRadius) const
 {
-    return edfPtr->queryDistSqr(p) > safeRadius * safeRadius;
+    // 因为在 initialize 时已经执行过 inflateObstacles 膨胀了地图
+    // 此处直接查询查询点 p 是否在膨胀后的占据空间即可，忽略传入的 safeRadius(保证接口兼容性)
+    return !gridPtr->queryOccupied(p);
+}
+
+void BinaryGridField::getPointCloud(sensor_msgs::PointCloud2 &msg) const
+{
+    // 1. 统计当前有多少个被占据（包含膨胀后）的体素
+    size_t num_points = 0;
+    size_t total_voxels = size_t(sizeXYZ(0)) * sizeXYZ(1) * sizeXYZ(2);
+    for (size_t i = 0; i < total_voxels; ++i) {
+        if (occupancyPtr[i]) {
+            num_points++;
+        }
+    }
+
+    // 2. 初始化 PointCloud2 消息结构
+    msg.height = 1;
+    msg.width = num_points;
+    msg.is_bigendian = false;
+    msg.is_dense = true;
+
+    // 使用 Modifier 设置字段为标准 xyz 格式并分配内存
+    sensor_msgs::PointCloud2Modifier modifier(msg);
+    modifier.setPointCloud2FieldsByString(1, "xyz");
+    modifier.resize(num_points);
+
+    // 创建安全迭代器
+    sensor_msgs::PointCloud2Iterator<float> iter_x(msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(msg, "z");
+
+    // 3. 将被占据体素的网格中心坐标填入点云
+    for (int x = 0; x < sizeXYZ(0); x++) {
+        for (int y = 0; y < sizeXYZ(1); y++) {
+            for (int z = 0; z < sizeXYZ(2); z++) {
+                if (occupancyPtr[x + y * stepY + z * stepZ]) {
+                    *iter_x = x * linearScale + originVec(0) + linearScale / 2.0;
+                    *iter_y = y * linearScale + originVec(1) + linearScale / 2.0;
+                    *iter_z = z * linearScale + originVec(2) + linearScale / 2.0;
+                    ++iter_x; ++iter_y; ++iter_z;
+                }
+            }
+        }
+    }
+}
+
+void GlobalMap::publishInflatedMap(sensor_msgs::PointCloud2 &msg) const
+{
+    if (gridPtr != nullptr) {
+        gridPtr->getPointCloud(msg);
+    }
 }
