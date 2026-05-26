@@ -48,6 +48,9 @@ struct Config
     double local_goal_ratio;
     double replan_time_ahead;
     double min_traj_remaining_time;
+    double min_replan_interval;
+    double emergency_stop_duration;
+    double local_goal_sample_angle;
     double alg;
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
@@ -85,6 +88,9 @@ struct Config
         nh_priv.getParam("Local_goal_ratio", conf.local_goal_ratio);
         nh_priv.getParam("Replan_time_ahead", conf.replan_time_ahead);
         nh_priv.getParam("Min_traj_remaining_time", conf.min_traj_remaining_time);
+        nh_priv.getParam("Min_replan_interval", conf.min_replan_interval);
+        nh_priv.getParam("Emergency_stop_duration", conf.emergency_stop_duration);
+        nh_priv.getParam("Local_goal_sample_angle", conf.local_goal_sample_angle);
         nh_priv.getParam("Alg", conf.alg);
     }
 };

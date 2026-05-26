@@ -21,6 +21,16 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+enum class ReplanState
+{
+    INIT,
+    WAIT_TARGET,
+    EXEC_TRAJ,
+    REPLAN_TRAJ,
+    EMERGENCY_STOP
+};
+
+
 class MavGlobalPlanner
 {
 public:
@@ -68,18 +78,35 @@ public:
     ros::Time lastReplanTime;
 
     void tryReplan(const ros::Time &stamp);
+
     bool planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                                  const Eigen::Vector3d &startVel,
                                  const Eigen::Vector3d &startAcc,
                                  const Eigen::Vector3d &goal,
                                  const ros::Time &stamp);
+
     bool checkCurrentTrajSafe(const ros::Time &stamp) const;
+
     Eigen::Vector3d selectLocalGoal(const Eigen::Vector3d &startPos) const;
+
+    bool getReplanStartState(const ros::Time &stamp,
+                             Eigen::Vector3d &startPos,
+                             Eigen::Vector3d &startVel,
+                             Eigen::Vector3d &startAcc,
+                             ros::Time &trajStartStamp) const;
+
+    bool publishEmergencyStopTraj(const ros::Time &stamp);
+
+    bool isTrajectorySafe(const Trajectory &traj,
+                          const ros::Time &trajStartStamp,
+                          const ros::Time &stamp) const;
 
     std::shared_ptr<PriorGlobalMap> glbMapPtr;    // 先验全局地图
     std::shared_ptr<LocalPerceptionMap> localMapPtr;  // 当前局部感知地图
     R3Planner r3planner;
     TrajGen trajGen;
     Visualization visualization;
+    ReplanState replanState;
 };
+
 #endif
