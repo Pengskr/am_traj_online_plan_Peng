@@ -50,5 +50,7 @@ SpatialResolution:           0.05
 
 Epsilon:                     0.02
 
+Local_map_update_dt:         0.10   # 10Hz
+
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理

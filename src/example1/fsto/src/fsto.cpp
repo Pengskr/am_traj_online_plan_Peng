@@ -46,7 +46,7 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
 
     // ======= 降频更新与发布局部感知膨胀地图 =======
     static ros::Time last_local_map_update_time = ros::Time(0);
-    double local_map_update_dt = 0.10;
+    double local_map_update_dt = config.local_map_update_dt;
 
     if (mapInitialized && (msg->header.stamp - last_local_map_update_time).toSec() > local_map_update_dt)
     {

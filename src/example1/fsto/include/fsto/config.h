@@ -41,6 +41,7 @@ struct Config
     double temporalResolution;
     double spatialResolution;
     double epsilon;
+    double local_map_update_dt;
     double alg;
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
@@ -71,6 +72,7 @@ struct Config
         nh_priv.getParam("TemporalResolution", conf.temporalResolution);
         nh_priv.getParam("SpatialResolution", conf.spatialResolution);
         nh_priv.getParam("Epsilon", conf.epsilon);
+        nh_priv.getParam("Local_map_update_dt", conf.local_map_update_dt);
         nh_priv.getParam("Alg", conf.alg);
     }
 };
