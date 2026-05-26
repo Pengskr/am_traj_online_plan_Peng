@@ -172,13 +172,27 @@ void BinaryGridField::getOccupiedPointsInRadius(
 {
     pts.clear();
 
-    double radius_sqr = radius * radius;
+    Eigen::Vector3i min_id;
+    Eigen::Vector3i max_id;
 
-    for (int x = 0; x < sizeXYZ(0); ++x)
+    min_id << std::floor((center(0) - radius - originVec(0)) / linearScale),
+              std::floor((center(1) - radius - originVec(1)) / linearScale),
+              std::floor((center(2) - radius - originVec(2)) / linearScale);
+
+    max_id << std::ceil((center(0) + radius - originVec(0)) / linearScale),
+              std::ceil((center(1) + radius - originVec(1)) / linearScale),
+              std::ceil((center(2) + radius - originVec(2)) / linearScale);
+
+    min_id = min_id.cwiseMax(Eigen::Vector3i(0, 0, 0));
+    max_id = max_id.cwiseMin(sizeXYZ - Eigen::Vector3i(1, 1, 1));
+
+    const double radius_sqr = radius * radius;
+
+    for (int x = min_id(0); x <= max_id(0); ++x)
     {
-        for (int y = 0; y < sizeXYZ(1); ++y)
+        for (int y = min_id(1); y <= max_id(1); ++y)
         {
-            for (int z = 0; z < sizeXYZ(2); ++z)
+            for (int z = min_id(2); z <= max_id(2); ++z)
             {
                 int adr = x + y * stepY + z * stepZ;
 
@@ -274,7 +288,9 @@ void PriorGlobalMap::getOccupiedPointsInRadius(std::vector<Eigen::Vector3d> &pts
 
 LocalPerceptionMap::LocalPerceptionMap(const Config &conf)
     : config(conf),
-      localGridPtr(nullptr)
+      localGridPtr(nullptr),
+      mapCenter(Eigen::Vector3d::Zero()),
+      visibleRadius(0.0)
 {
 }
 
