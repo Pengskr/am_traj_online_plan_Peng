@@ -26,6 +26,7 @@ class TrajGen
 {
 public:
     TrajGen(const Config &conf, std::shared_ptr<const LocalPerceptionMap> mapPtr);
+    
     Trajectory generate(std::vector<Eigen::Vector3d> &route,
                         Eigen::Vector3d initialVel,
                         Eigen::Vector3d initialAcc,
@@ -33,6 +34,11 @@ public:
                         Eigen::Vector3d finalAcc,
                         int id_alg,
                         Visualization visualization) const;
+
+    bool segmentSafe(const Eigen::Vector3d &a,
+                 const Eigen::Vector3d &b,
+                 double resolution,
+                 double safeRadius) const;
 
 public:
     Config config;

@@ -127,6 +127,63 @@ bool BinaryGridField::queryOccupied(const Eigen::Vector3d &pos) const
     }
 }
 
+bool BinaryGridField::queryOccupiedWithRadius(const Eigen::Vector3d &pos,
+                                              double radius) const
+{
+    if (radius <= 1e-6)
+    {
+        return queryOccupied(pos);
+    }
+
+    int cx = std::floor((pos(0) - originVec(0)) / linearScale);
+    int cy = std::floor((pos(1) - originVec(1)) / linearScale);
+    int cz = std::floor((pos(2) - originVec(2)) / linearScale);
+
+    if (cx < 0 || cy < 0 || cz < 0 ||
+        cx >= sizeXYZ(0) || cy >= sizeXYZ(1) || cz >= sizeXYZ(2))
+    {
+        return true;
+    }
+
+    const int r_vox = std::ceil(radius / linearScale);
+    const double radius_sqr = radius * radius;
+
+    for (int dx = -r_vox; dx <= r_vox; ++dx)
+    {
+        for (int dy = -r_vox; dy <= r_vox; ++dy)
+        {
+            for (int dz = -r_vox; dz <= r_vox; ++dz)
+            {
+                const double dist_sqr =
+                    static_cast<double>(dx * dx + dy * dy + dz * dz) *
+                    linearScale * linearScale;
+
+                if (dist_sqr > radius_sqr)
+                {
+                    continue;
+                }
+
+                int nx = cx + dx;
+                int ny = cy + dy;
+                int nz = cz + dz;
+
+                if (nx < 0 || ny < 0 || nz < 0 ||
+                    nx >= sizeXYZ(0) || ny >= sizeXYZ(1) || nz >= sizeXYZ(2))
+                {
+                    return true;
+                }
+
+                if (occupancyPtr[nx + ny * stepY + nz * stepZ])
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 void BinaryGridField::getLocalPointCloud(sensor_msgs::PointCloud2 &msg, const Eigen::Vector3d &pos, double radius) const
 {
     // 1. 将无人机的物理坐标转换为网格索引
@@ -385,9 +442,12 @@ bool LocalPerceptionMap::safeQuery(const Eigen::Vector3d &p, double safeRadius) 
     {
         return true;
     }
-    
 
-    return !localGridPtr->queryOccupied(p);
+    // localGridPtr 已经按 bodySafeRadius 膨胀。
+    // 如果调用方要求更大的 safeRadius，则额外检查邻域。
+    double extraRadius = std::max(0.0, safeRadius - config.bodySafeRadius);
+
+    return !localGridPtr->queryOccupiedWithRadius(p, extraRadius);
 }
 
 

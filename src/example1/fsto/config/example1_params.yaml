@@ -17,7 +17,7 @@ OdomFrame:                  'odom'
 # Params
 UnitScaleInSI:               1.0
 
-R3SafeRadius:                0.45
+R3SafeRadius:                0.50
 
 BodySafeRadius:              0.30
 

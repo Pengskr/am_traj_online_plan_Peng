@@ -27,6 +27,9 @@ public:
 
     bool queryOccupied(const Eigen::Vector3d &pos) const;
 
+    bool queryOccupiedWithRadius(const Eigen::Vector3d &pos,
+                             double radius) const;
+
     void getLocalPointCloud(sensor_msgs::PointCloud2 &msg,
                             const Eigen::Vector3d &pos,
                             double radius) const;

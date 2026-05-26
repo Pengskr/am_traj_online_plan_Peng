@@ -132,6 +132,35 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d>
     return safe;
 }
 
+bool TrajGen::segmentSafe(const Eigen::Vector3d &a,
+                          const Eigen::Vector3d &b,
+                          double resolution,
+                          double safeRadius) const
+{
+    Eigen::Vector3d diff = b - a;
+    double len = diff.norm();
+
+    if (len < 1e-6)
+    {
+        return MapPtr->safeQuery(a, safeRadius);
+    }
+
+    int steps = std::ceil(len / resolution);
+
+    for (int i = 0; i <= steps; ++i)
+    {
+        double s = static_cast<double>(i) / steps;
+        Eigen::Vector3d p = a + s * diff;
+
+        if (!MapPtr->safeQuery(p, safeRadius))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // 经典的道格拉斯-普克（Douglas-Peucker）算法（或类似原理的递归路径简化方法），用于减少路径中的点数，同时保持路径形状的近似度在一个可接受的范围内。
 std::vector<Eigen::Vector3d> TrajGen::routeSimplify(const vector<Vector3d> &route, double resolution) const
 {
@@ -166,10 +195,23 @@ std::vector<Eigen::Vector3d> TrajGen::routeSimplify(const vector<Vector3d> &rout
         }
         else
         {
-            subRoute.push_back(route.front());
-            subRoute.push_back(route.back());
+            if (segmentSafe(route.front(),
+                            route.back(),
+                            config.spatialResolution,
+                            config.r3SafeRadius))
+            {
+                subRoute.push_back(route.front());
+                subRoute.push_back(route.back());
+            }
+            else
+            {
+                // 如果直连线段不安全，则不要过度简化，保留原路径
+                subRoute = route;
+            }
         }
     }
 
     return subRoute;
 }
+
+
