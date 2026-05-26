@@ -7,4 +7,7 @@
         <!-- node parameters -->
         <rosparam file="$(find example1)/config/example1_params.yaml" command="load" />
     </node>
+
+    <node pkg="example1" type="key2joy.py" name="key2joy" output="screen" />
+    
 </launch>
