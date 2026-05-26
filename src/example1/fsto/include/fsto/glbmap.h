@@ -4,35 +4,34 @@
 #include "fsto/config.h"
 
 #include <memory>
+#include <vector>
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 
 #include <Eigen/Eigen>
 
-class EuclidDistField
+// 替换掉原有的 EuclidDistField
+class BinaryGridField
 {
 public:
-    EuclidDistField(Eigen::Vector3i xyz, Eigen::Vector3d offset, double scale);
-    ~EuclidDistField();
-    EuclidDistField(const EuclidDistField &) = delete;
+    BinaryGridField(Eigen::Vector3i xyz, Eigen::Vector3d offset, double scale);
+    ~BinaryGridField();
+    BinaryGridField(const BinaryGridField &) = delete;
 
     void setOccupied(const Eigen::Vector3d &pos);
-    void updateCubicEDF(void);
-    double queryDistSqr(const Eigen::Vector3d &pos) const;
-    double queryDist(const Eigen::Vector3d &pos) const;
+    void inflateObstacles(double inflateRadius); // 障碍物膨胀
+    bool queryOccupied(const Eigen::Vector3d &pos) const; // 查询是否被占据
+    void getPointCloud(sensor_msgs::PointCloud2 &msg) const; // 转换为点云
 
 private:
     Eigen::Vector3i sizeXYZ;
     Eigen::Vector3d originVec;
     double linearScale;
 
-    double *sqrDistsPtr;
+    bool *occupancyPtr; // 二值占据数组
 
     size_t stepX, stepY, stepZ;
-    double linearScaleSqr;
-
-    void updateLinearEDF(double *p, size_t step, size_t N, double sqrLinearScale) const;
 };
 
 class GlobalMap
@@ -42,10 +41,11 @@ public:
     ~GlobalMap();
     void initialize(const sensor_msgs::PointCloud2::ConstPtr &msg);
     bool safeQuery(const Eigen::Vector3d &p, double safeRadius) const;
+    void publishInflatedMap(sensor_msgs::PointCloud2 &msg) const; // 供上层调用的接口
 
 private:
     Config config;
-    EuclidDistField *edfPtr;
+    BinaryGridField *gridPtr; // 将 edfPtr 替换为 gridPtr
 };
 
 #endif

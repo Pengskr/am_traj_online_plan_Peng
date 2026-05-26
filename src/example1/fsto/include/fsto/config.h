@@ -18,6 +18,7 @@ struct Config
     // Advertised Topics
     std::string trajectoryTopic;
     std::string autoManualTopic;
+    std::string inflateMapTopic;
 
     // Frame Names
     std::string odomFrame;
@@ -39,6 +40,7 @@ struct Config
     double temporalResolution;
     double spatialResolution;
     double epsilon;
+    
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
     {
@@ -49,6 +51,7 @@ struct Config
         nh_priv.getParam("TrajTriggerTopic", conf.trajTriggerTopic);
         nh_priv.getParam("TrajectoryTopic", conf.trajectoryTopic);
         nh_priv.getParam("AutoManualTopic", conf.autoManualTopic);
+        nh_priv.getParam("InflateMapTopic", conf.inflateMapTopic);       
         nh_priv.getParam("OdomFrame", conf.odomFrame);
         nh_priv.getParam("UnitScaleInSI", conf.unitScaleInSI);
         nh_priv.getParam("R3SafeRadius", conf.r3SafeRadius);

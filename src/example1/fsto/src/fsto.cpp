@@ -24,6 +24,7 @@ MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
                                   TransportHints().tcpNoDelay());
     trajPub = nh.advertise<quadrotor_msgs::PolynomialTrajectory>(config.trajectoryTopic, 1);
     autoManualPub = nh.advertise<sensor_msgs::Joy>(config.autoManualTopic, 1);
+    inflate_map_pub_ = nh.advertise<sensor_msgs::PointCloud2>(config.inflateMapTopic, 1);
     odomStamp = Time::now();
 }
 
@@ -66,6 +67,15 @@ void MavGlobalPlanner::mapCallBack(const sensor_msgs::PointCloud2::ConstPtr &msg
     {
         glbMapPtr->initialize(msg);
         mapInitialized = true;
+
+        sensor_msgs::PointCloud2 inflate_msg;
+        glbMapPtr->publishInflatedMap(inflate_msg); 
+        // 保持时间戳与坐标系的一致性
+        inflate_msg.header.stamp = msg->header.stamp;
+        inflate_msg.header.frame_id = msg->header.frame_id; 
+        
+        inflate_map_pub_.publish(inflate_msg);
+
         ROS_WARN("Map Initialized !!!");
     }
 }
@@ -122,27 +132,14 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
             finVel.setZero();
             finAcc.setZero();
 
-            trajGen.trajOpt.maxIterations = config.iterations * 4;
-            trajGen.trajOpt.epsilon = config.epsilon * 0.01;
-            Trajectory traj_cons_AM_old = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 6);
-            if (traj_cons_AM_old.getPieceNum() > 0)
+            Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 3);  // 根据Odom获取当前速度、加速度 进行轨迹生成
+            if (traj_cons_AM.getPieceNum() > 0)
             {
                 quadrotor_msgs::PolynomialTrajectory trajMsg;
-                polynomialTrajConverter(traj_cons_AM_old, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
+                polynomialTrajConverter(traj_cons_AM, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
                 trajPub.publish(trajMsg);
-                visualization.visualize(traj_cons_AM_old, route, ros::Time::now(), 6);
-                std::cout << "t_lap: " << traj_cons_AM_old.getTotalDuration() << std::endl;              
+                visualization.visualize(traj_cons_AM, route, ros::Time::now(), 1);            
             }
-            
-            // Trajectory traj_cons_AM_with_scale = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, 2);
-            // if (traj_cons_AM_with_scale.getPieceNum() > 0)
-            // {
-            //     quadrotor_msgs::PolynomialTrajectory trajMsg;
-            //     polynomialTrajConverter(traj_cons_AM_with_scale, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-            //     trajPub.publish(trajMsg);
-            //     visualization.visualize(traj_cons_AM_with_scale, route, ros::Time::now(), 4);
-            //     std::cout << "t_lap: " << traj_cons_AM_with_scale.getTotalDuration() << std::endl;
-            // }  
         }
     }
 }
