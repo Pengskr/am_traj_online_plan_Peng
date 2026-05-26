@@ -42,6 +42,10 @@ struct Config
     double spatialResolution;
     double epsilon;
     double local_map_update_dt;
+    double replan_dt;
+    double collision_check_horizon;
+    double collision_check_dt;
+    double local_goal_ratio;
     double alg;
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
@@ -73,6 +77,10 @@ struct Config
         nh_priv.getParam("SpatialResolution", conf.spatialResolution);
         nh_priv.getParam("Epsilon", conf.epsilon);
         nh_priv.getParam("Local_map_update_dt", conf.local_map_update_dt);
+        nh_priv.getParam("Replan_dt", conf.replan_dt);
+        nh_priv.getParam("Collision_check_horizon", conf.collision_check_horizon);
+        nh_priv.getParam("Collision_check_dt", conf.collision_check_dt);
+        nh_priv.getParam("Local_goal_ratio", conf.local_goal_ratio);
         nh_priv.getParam("Alg", conf.alg);
     }
 };

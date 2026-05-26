@@ -57,6 +57,25 @@ public:
     bool mapInitialized;
     bool localMapInitialized;
 
+    // ===== Online replanning =====
+    bool hasTarget;
+    Eigen::Vector3d globalGoal;
+
+    bool hasActiveTraj;
+    Trajectory currentTraj;
+    ros::Time currentTrajStartTime;
+
+    ros::Time lastReplanTime;
+
+    void tryReplan(const ros::Time &stamp);
+    bool planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
+                                 const Eigen::Vector3d &startVel,
+                                 const Eigen::Vector3d &startAcc,
+                                 const Eigen::Vector3d &goal,
+                                 const ros::Time &stamp);
+    bool checkCurrentTrajSafe(const ros::Time &stamp) const;
+    Eigen::Vector3d selectLocalGoal(const Eigen::Vector3d &startPos) const;
+
     std::shared_ptr<PriorGlobalMap> glbMapPtr;    // 先验全局地图
     std::shared_ptr<LocalPerceptionMap> localMapPtr;  // 当前局部感知地图
     R3Planner r3planner;

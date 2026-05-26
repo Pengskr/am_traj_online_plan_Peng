@@ -172,6 +172,9 @@
  <node name="rviz" pkg="rviz" type="rviz" output="screen"
        args="-d $(find cascade_controller)/cfg/rviz_config.rviz"> 
 </node>
+ <node name="rviz_FPS" pkg="rviz" type="rviz" output="screen"
+       args="-d $(find cascade_controller)/cfg/rviz_FPS_config.rviz"> 
+</node>
 
 <!-- Joy Node -->
 <!-- <node pkg="joy" type="joy_node" name="joy" output="screen"> -->

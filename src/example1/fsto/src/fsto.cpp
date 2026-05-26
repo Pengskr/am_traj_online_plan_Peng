@@ -6,7 +6,10 @@ using namespace Eigen;
 
 MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
     : config(conf), nh(nh_), odomInitialized(false),
-      accInitialized(false), mapInitialized(false),localMapInitialized(false),
+      accInitialized(false), mapInitialized(false), localMapInitialized(false),
+      hasTarget(false),
+      hasActiveTraj(false),
+      lastReplanTime(ros::Time(0)),
       glbMapPtr(make_shared<PriorGlobalMap>(config)),
       localMapPtr(make_shared<LocalPerceptionMap>(config)),
       r3planner(config, localMapPtr),
@@ -41,7 +44,7 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
                              msg->pose.pose.orientation.y, msg->pose.pose.orientation.z);
     curOdomPose = tranOdomBody * quatOdomBody;
     curOdomVel = Vector3d(msg->twist.twist.linear.x, msg->twist.twist.linear.y, msg->twist.twist.linear.z);
-    odomStamp = Time::now();
+    odomStamp = msg->header.stamp;
     odomInitialized = true;
 
     // ======= 降频更新与发布局部感知膨胀地图 =======
@@ -67,6 +70,12 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
         inflate_map_pub.publish(inflate_msg);
 
         last_local_map_update_time = msg->header.stamp;
+
+        // 新增：局部地图更新后检查是否需要重规划
+        if (hasTarget)
+        {
+            tryReplan(msg->header.stamp);
+        }
     }
     // ============================================
 }
@@ -100,67 +109,24 @@ void MavGlobalPlanner::mapCallBack(const sensor_msgs::PointCloud2::ConstPtr &msg
 
 void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
 {
-    if (mapInitialized && localMapInitialized)
+    if (!mapInitialized || !localMapInitialized || !odomInitialized)
     {
-        Vector3d s(curOdomPose.translation());  // 根据里程计获取当前位置
-        double zGoal = fabs(msg->pose.orientation.z) * (config.r3Bound[5] - config.r3Bound[4] - 2 * config.r3SafeRadius) +
-                       config.r3Bound[4] + config.r3SafeRadius;     // 目标高度位置单独设置
-        Vector3d g(msg->pose.position.x, msg->pose.position.y, zGoal);
-        vector<Vector3d> route;
-
-        r3planner.planOnce(s, g, route); // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
-
-        // // 考虑中间点
-        // vector<Vector3d> waypoints = {
-        //     // s,
-        //     // Vector3d(-1, -13, 3),
-        //     // Vector3d(10, -8, 3),
-        //     // Vector3d(6, 3, 3),
-        //     // Vector3d(5, 6, 3),
-        //     // Vector3d(-3, 5, 2),
-        //     // Vector3d(-13, 7, 3),
-        //     // Vector3d(-8, -1, 3),
-        //     // s
-
-        //     s,
-        //     Vector3d(-4, -5, 3),
-        //     Vector3d(3, -6, 3),
-        //     Vector3d(9, -3, 3),
-        //     Vector3d(4, 3, 3),
-        //     Vector3d(9, 9, 2),
-        //     Vector3d(6, 11, 2),
-        //     Vector3d(0, 3, 3),
-        //     Vector3d(-7, 7, 3),
-        //     s
-        // };
-        // vector<Vector3d> route_temp;
-        // for (size_t i = 1; i < waypoints.size(); ++i)
-        // {
-        //     route_temp.clear();
-        //     r3planner.planOnce(waypoints[i-1], waypoints[i], route_temp);   // 使用OMPL中的InformedRRTstar，搜索时长为 config.SearchDuration，搜索结果保存在route中
-        //     // 避免重复连接点
-        //     if (i > 1 && !route_temp.empty()) route_temp.erase(route_temp.begin());
-        //     route.insert(route.end(), route_temp.begin(), route_temp.end());
-        // }
-
-
-        if (route.size() > 1)
-        {
-            Vector3d finVel, finAcc;
-            finVel.setZero();
-            finAcc.setZero();
-
-            Trajectory traj_cons_AM = trajGen.generate(route, curOdomVel, curOdomAcc, finVel, finAcc, config.alg, visualization);  // 根据Odom获取当前速度、加速度 进行轨迹生成
-            if (traj_cons_AM.getPieceNum() > 0)
-            {
-                quadrotor_msgs::PolynomialTrajectory trajMsg;
-                polynomialTrajConverter(traj_cons_AM, trajMsg, Eigen::Isometry3d::Identity(), odomStamp);
-                trajPub.publish(trajMsg);
-                visualization.visualize(traj_cons_AM, route, ros::Time::now(), 1);            
-            }
-        }
+        ROS_WARN("Waiting for odom, global map and local map.");
+        return;
     }
-    else ROS_WARN("Waiting for global map and local map.");
+
+    double zGoal = fabs(msg->pose.orientation.z) *
+                       (config.r3Bound[5] - config.r3Bound[4] - 2 * config.r3SafeRadius) +
+                   config.r3Bound[4] + config.r3SafeRadius;
+
+    globalGoal = Eigen::Vector3d(msg->pose.position.x,
+                                 msg->pose.position.y,
+                                 zGoal);
+
+    hasTarget = true;
+    ROS_WARN("[Replan] New global goal received.");
+
+    tryReplan(odomStamp);
 }
 
 void MavGlobalPlanner::trajTriggerCallBack(const geometry_msgs::PoseStamped::ConstPtr &msg)
@@ -173,6 +139,180 @@ void MavGlobalPlanner::trajTriggerCallBack(const geometry_msgs::PoseStamped::Con
     }
     joyMsg.buttons.at(JOY_AUTO) = 1;
     autoManualPub.publish(joyMsg);
+}
+
+void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
+{
+    if (!hasTarget || !odomInitialized || !mapInitialized || !localMapInitialized)
+    {
+        return;
+    }
+
+    // if ((globalGoal - curOdomPose.translation()).norm() < config.r3SafeRadius)
+    if ((globalGoal - curOdomPose.translation()).norm() < 0.1)
+    {
+        ROS_WARN("[Replan] Global goal reached.");
+        hasTarget = false;
+        return;
+    }
+
+    bool needReplan = false;
+
+    // 1. 当前没有轨迹，必须规划
+    if (!hasActiveTraj)
+    {
+        needReplan = true;
+    }
+
+    // 2. 当前轨迹未来一段时间不安全，立即重规划
+    if (hasActiveTraj && !checkCurrentTrajSafe(stamp))
+    {
+        ROS_WARN("[Replan] Current trajectory is unsafe. Trigger replanning.");
+        needReplan = true;
+    }
+
+    // 3. 周期性重规划
+    if ((stamp - lastReplanTime).toSec() > config.replan_dt)
+    {
+        needReplan = true;
+    }
+
+    if (!needReplan)
+    {
+        return;
+    }
+
+    Eigen::Vector3d startPos = curOdomPose.translation();
+    Eigen::Vector3d startVel = curOdomVel;
+    Eigen::Vector3d startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+
+    Eigen::Vector3d localGoal = selectLocalGoal(startPos);
+
+    bool success = planAndPublishLocalTraj(startPos, startVel, startAcc, localGoal, stamp);
+
+    if (success)
+    {
+        lastReplanTime = stamp;
+    }
+    else
+    {
+        ROS_WARN("[Replan] Local replanning failed.");
+    }
+}
+
+Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPos) const
+{
+    Eigen::Vector3d diff = globalGoal - startPos;
+    double dist = diff.norm();
+
+    if (dist < 1e-3)
+    {
+        return globalGoal;
+    }
+
+    double localGoalDist = std::min(dist, config.local_goal_ratio * config.sensingRadius);
+
+    Eigen::Vector3d localGoal = startPos + diff.normalized() * localGoalDist;
+
+    // 保持目标高度朝 globalGoal 过渡
+    localGoal(2) = globalGoal(2);
+
+    // 限制在全局高度边界内
+    localGoal(2) = std::max(config.r3Bound[4] + config.r3SafeRadius,
+                            std::min(config.r3Bound[5] - config.r3SafeRadius,
+                                     localGoal(2)));
+
+    return localGoal;
+}
+
+bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
+                                               const Eigen::Vector3d &startVel,
+                                               const Eigen::Vector3d &startAcc,
+                                               const Eigen::Vector3d &goal,
+                                               const ros::Time &stamp)
+{
+    std::vector<Eigen::Vector3d> route;
+
+    r3planner.planOnce(startPos, goal, route);
+
+    if (route.size() <= 1)
+    {
+        ROS_WARN("[Replan] R3Planner failed.");
+        return false;
+    }
+
+    Eigen::Vector3d finVel = Eigen::Vector3d::Zero();
+    Eigen::Vector3d finAcc = Eigen::Vector3d::Zero();
+
+    Trajectory traj = trajGen.generate(route,
+                                       startVel,
+                                       startAcc,
+                                       finVel,
+                                       finAcc,
+                                       config.alg,
+                                       visualization);
+
+    if (traj.getPieceNum() <= 0)
+    {
+        ROS_WARN("[Replan] TrajGen failed.");
+        return false;
+    }
+
+    quadrotor_msgs::PolynomialTrajectory trajMsg;
+    ros::Time trajStartStamp = stamp;
+
+    polynomialTrajConverter(traj,
+                            trajMsg,
+                            Eigen::Isometry3d::Identity(),
+                            trajStartStamp);
+
+    trajPub.publish(trajMsg);
+    visualization.visualize(traj, route, ros::Time::now(), 1);
+
+    currentTraj = traj;
+    currentTrajStartTime = trajStartStamp;
+    hasActiveTraj = true;
+
+    ROS_WARN("[Replan] New local trajectory published. Duration = %.3f",
+             traj.getTotalDuration());
+
+    return true;
+}
+
+bool MavGlobalPlanner::checkCurrentTrajSafe(const ros::Time &stamp) const
+{
+    if (!hasActiveTraj || currentTraj.getPieceNum() <= 0)
+    {
+        return false;
+    }
+
+    double t_now = (stamp - currentTrajStartTime).toSec();
+
+    if (t_now < 0.0)
+    {
+        t_now = 0.0;
+    }
+
+    double totalT = currentTraj.getTotalDuration();
+
+    if (t_now >= totalT)
+    {
+        return false;
+    }
+
+    double t_end = std::min(totalT, t_now + config.collision_check_horizon);
+
+    for (double t = t_now; t <= t_end; t += config.collision_check_dt)
+    {
+        Eigen::Vector3d p = currentTraj.getPos(t);
+
+        if (!localMapPtr->safeQuery(p, config.bodySafeRadius))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void MavGlobalPlanner::polynomialTrajConverter(const Trajectory &traj,

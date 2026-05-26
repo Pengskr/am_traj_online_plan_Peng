@@ -52,5 +52,11 @@ Epsilon:                     0.02
 
 Local_map_update_dt:         0.10   # 10Hz
 
+# Online replanning
+Replan_dt:                  0.50   # 周期性重规划间隔
+Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s
+Collision_check_dt:         0.10
+Local_goal_ratio:           0.90   # local goal = 0.8 * sensing radius
+
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
