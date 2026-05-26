@@ -177,14 +177,29 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
         needReplan = true;
     }
 
+    // 4. 当前轨迹剩余时间不足时强制重规划
+    if (hasActiveTraj)
+    {
+        double t_now = (stamp - currentTrajStartTime).toSec();
+        double remaining_time = currentTraj.getTotalDuration() - t_now;
+
+        if (remaining_time < config.min_traj_remaining_time)
+        {
+            needReplan = true;
+        }
+    }
+
     if (!needReplan)
     {
         return;
     }
 
-    Eigen::Vector3d startPos = curOdomPose.translation();
-    Eigen::Vector3d startVel = curOdomVel;
-    Eigen::Vector3d startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+    // 用旧轨迹前向拼接点作为新轨迹起点
+    double t_now = stamp - currentTrajStartTime;
+    double t_replan = t_now + config.replan_time_ahead;
+    Eigen::Vector3d startPos = currentTraj.getPos(t_replan);
+    Eigen::Vector3d startVel = currentTraj.getVel(t_replan);
+    Eigen::Vector3d startAcc = currentTraj.getAcc(t_replan);
 
     Eigen::Vector3d localGoal = selectLocalGoal(startPos);
 

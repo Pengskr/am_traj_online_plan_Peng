@@ -46,6 +46,8 @@ struct Config
     double collision_check_horizon;
     double collision_check_dt;
     double local_goal_ratio;
+    double replan_time_ahead;
+    double min_traj_remaining_time;
     double alg;
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
@@ -81,6 +83,8 @@ struct Config
         nh_priv.getParam("Collision_check_horizon", conf.collision_check_horizon);
         nh_priv.getParam("Collision_check_dt", conf.collision_check_dt);
         nh_priv.getParam("Local_goal_ratio", conf.local_goal_ratio);
+        nh_priv.getParam("Replan_time_ahead", conf.replan_time_ahead);
+        nh_priv.getParam("Min_traj_remaining_time", conf.min_traj_remaining_time);
         nh_priv.getParam("Alg", conf.alg);
     }
 };

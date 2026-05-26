@@ -57,6 +57,8 @@ Replan_dt:                  0.50   # 周期性重规划间隔
 Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s
 Collision_check_dt:         0.10
 Local_goal_ratio:           0.90   # local goal = 0.8 * sensing radius
+Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
+Min_traj_remaining_time:    0.50   # 当前轨迹剩余时间不足时强制重规划
 
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
