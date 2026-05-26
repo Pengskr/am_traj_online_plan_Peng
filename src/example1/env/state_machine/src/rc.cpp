@@ -489,8 +489,8 @@ RC::Logic::sdkPoll()
   if (hostRC->logic->is("mission"_s))
   {
     hostRC->takeoffHover = false;
-    if (counter++ % 100 == 0)
-      ROS_INFO("SDK Mission");
+    // if (counter++ % 100 == 0)
+    //   ROS_INFO("SDK Mission");
     return; //! @note returned
   }
   else

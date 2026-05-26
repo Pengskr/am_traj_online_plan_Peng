@@ -61,8 +61,8 @@ void
 OperationalLogic::missionPoll()
 {
   static int counter = 0;
-  if (counter++ % 100 == 0)
-    std::cout << "~~~~Mission Poll" << std::endl;
+  // if (counter++ % 100 == 0)
+  //   std::cout << "~~~~Mission Poll" << std::endl;
   mission.poll();
 }
 
