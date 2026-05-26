@@ -24,7 +24,7 @@ ros::Publisher _all_map_pub;
 ros::Publisher _all_ground_pub;
 ros::Subscriber _odom_sub;
 
-int _obs_num, _cir_num;
+int _obs_num, _cir_num, _random_seed;
 double _x_size, _y_size, _z_size, _init_x, _init_y, _resolution, _sense_rate;
 double _x_l, _x_h, _y_l, _y_h, _w_l, _w_h, _h_l, _h_h, _w_c_l, _w_c_h;
 
@@ -47,7 +47,7 @@ void RandomMapGenerate(bool ground_map_swt)
 
       random_device rd;
       // default_random_engine eng(rd());
-      default_random_engine eng(42);
+      default_random_engine eng(_random_seed);
 
       uniform_real_distribution<double> rand_x = uniform_real_distribution<double>(_x_l, _x_h);
       uniform_real_distribution<double> rand_y = uniform_real_distribution<double>(_y_l, _y_h);
@@ -246,6 +246,7 @@ int main(int argc, char **argv)
    n.param("map/obs_num", _obs_num, 30);
    n.param("map/circle_num", _cir_num, 30);
    n.param("map/resolution", _resolution, 0.2);
+   n.param("map/random_seed", _random_seed, 42);
 
    n.param("ObstacleShape/lower_rad", _w_l, 0.3);
    n.param("ObstacleShape/upper_rad", _w_h, 0.8);

@@ -25,7 +25,7 @@ SensingRadius:               4.0    # 局部感知半径 (米)
 
 EdfResolution:               0.10
 
-R3Bound:                     [-20.0, 20.0, -20.0, 20.0, 0.0, 5.0] 
+R3Bound:                     [-10.0, 10.0, -10.0, 10.0, 0.0, 5.0] 
                              # [xmin, xmax, ymin, ymax, zmin, zmax]
 
 SearchDuration:              0.10
@@ -54,14 +54,14 @@ Local_map_update_dt:         0.10   # 10Hz
 
 # Online replanning
 Replan_dt:                  0.50   # 周期性重规划间隔
-Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s
+Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s 是否发生碰撞
 Collision_check_dt:         0.10
 Local_goal_ratio:           0.90   # local goal = 0.8 * sensing radius
 Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
-Min_traj_remaining_time:    0.50   # 当前轨迹剩余时间不足时强制重规划
+Min_traj_remaining_time:    0.30   # 当前轨迹剩余时间不足时强制重规划
 Min_replan_interval:        0.20   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    30.0   # degree 局部目标候选采样角度间隔
 
 # 算法选择
-Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
+Alg:                         2      # 2 - 时域缩放； 3 - 精细化局部约束处理

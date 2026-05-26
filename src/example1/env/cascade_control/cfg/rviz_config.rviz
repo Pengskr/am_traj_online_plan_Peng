@@ -4,6 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Grid1
         - /Drone1
         - /Map1
         - /Map1/GlobalMap1/Autocompute Value Bounds1
@@ -82,7 +83,7 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 40
+      Plane Cell Count: 24
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/Axes
@@ -157,11 +158,11 @@ Visualization Manager:
           Use Fixed Frame: true
           Use rainbow: true
           Value: true
-        - Alpha: 0.800000011920929
+        - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.349999904632568
-            Min Value: 0.550000011920929
+            Max Value: 3.8499999046325684
+            Min Value: -0.15000000596046448
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -192,7 +193,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        trajectory: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -200,7 +201,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/waypoints
       Name: Waypoints
       Namespaces:
-        waypoints: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -239,25 +240,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 38.29939651489258
+      Distance: 24.27411651611328
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 4.276876449584961
-        Y: -6.1732306480407715
-        Z: 1.1862058639526367
+        X: -0.3072468042373657
+        Y: -8.491299629211426
+        Z: 1.1862077713012695
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7947970628738403
+      Pitch: 1.0247968435287476
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.311559677124023
+      Yaw: 4.711568832397461
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 4.048277378082275
