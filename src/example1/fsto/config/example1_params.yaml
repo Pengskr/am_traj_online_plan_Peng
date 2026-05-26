@@ -9,6 +9,7 @@ TrajTriggerTopic:           '/traj_start_trigger'
 # Topics Advertised
 TrajectoryTopic:            '/traj_server/trajectory'
 AutoManualTopic:            '/traj_server/auto_manual'
+InflateMapTopic:            'inflate_map'
 
 # Frame Names
 OdomFrame:                  'odom'
@@ -27,7 +28,7 @@ R3Bound:                     [-20.0, 20.0, -20.0, 20.0, 0.0, 5.0]
 
 SearchDuration:              0.10
 
-TryOut:                      7
+TryOut:                      10
 
 MaxAccRate:                  4.00
 
