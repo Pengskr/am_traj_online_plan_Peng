@@ -31,6 +31,9 @@ struct Config
     double edfResolution;
     std::vector<double> r3Bound;
     double searchDuration;
+    double r3_direction_min_vel;
+    double r3_direction_constraint_radius;
+    double r3_max_initial_turn_angle;
     int tryOut;
     double maxAccRate;
     double maxVelRate;
@@ -75,6 +78,9 @@ struct Config
         nh_priv.getParam("EdfResolution", conf.edfResolution);
         nh_priv.getParam("R3Bound", conf.r3Bound);
         nh_priv.getParam("SearchDuration", conf.searchDuration);
+        nh_priv.getParam("R3_direction_min_vel", conf.r3_direction_min_vel);
+        nh_priv.getParam("R3_direction_constraint_radius", conf.r3_direction_constraint_radius);
+        nh_priv.getParam("R3_max_initial_turn_angle", conf.r3_max_initial_turn_angle);
         nh_priv.getParam("TryOut", conf.tryOut);
         nh_priv.getParam("MaxAccRate", conf.maxAccRate);
         nh_priv.getParam("MaxVelRate", conf.maxVelRate);

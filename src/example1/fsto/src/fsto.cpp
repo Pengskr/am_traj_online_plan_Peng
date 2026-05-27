@@ -617,8 +617,18 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                                                const ros::Time &trajStartStamp)
 {
     std::vector<Eigen::Vector3d> route;
-    r3planner.planOnce(startPos, goal, route);
-    if (route.size() <= 1)
+    
+    double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
+
+    if (!std::isfinite(rrt_cost) || route.size() <= 1)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Directional R3Planner failed. Retry without direction constraint.");
+
+        route.clear();
+        rrt_cost = r3planner.planOnce(startPos, goal, route);
+    }
+
+    if (!std::isfinite(rrt_cost) || route.size() <= 1)
     {
         ROS_WARN("[planAndPublishLocalTraj] R3Planner failed.");
         return false;
