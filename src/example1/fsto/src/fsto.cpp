@@ -280,11 +280,9 @@ bool MavGlobalPlanner::getReplanStartState(const ros::Time &stamp,
         t_now = 0.0;
     }
 
-    double t_replan = t_now + config.replan_time_ahead;
     const double totalT = currentTraj.getTotalDuration();
 
-    // 旧轨迹剩余太短时，不再强行从旧轨迹采样未来点
-    if (t_replan >= totalT)
+    if (totalT <= 1e-3)
     {
         startPos = curOdomPose.translation();
         startVel = curOdomVel;
@@ -293,12 +291,37 @@ bool MavGlobalPlanner::getReplanStartState(const ros::Time &stamp,
         return true;
     }
 
-    startPos = currentTraj.getPos(t_replan);
-    startVel = currentTraj.getVel(t_replan);
-    startAcc = currentTraj.getAcc(t_replan);
+    double t_replan = t_now + config.replan_time_ahead;
 
-    // 新轨迹从旧轨迹未来拼接点开始
-    trajStartStamp = currentTrajStartTime + ros::Duration(t_replan);
+    if (t_replan < totalT)
+    {
+        startPos = currentTraj.getPos(t_replan);
+        startVel = currentTraj.getVel(t_replan);
+        startAcc = currentTraj.getAcc(t_replan);
+        trajStartStamp = currentTrajStartTime + ros::Duration(t_replan);
+        return true;
+    }
+
+    // 旧轨迹剩余太短时，尝试使用旧轨迹末端前的一个点。
+    // 但必须保证该点仍然位于当前时刻之后。
+    const double tail_margin = std::min(0.10, 0.5 * totalT);
+    const double t_tail = totalT - tail_margin;
+
+    if (t_tail > t_now)
+    {
+        startPos = currentTraj.getPos(t_tail);
+        startVel = currentTraj.getVel(t_tail);
+        startAcc = currentTraj.getAcc(t_tail);
+        trajStartStamp = currentTrajStartTime + ros::Duration(t_tail);
+        return true;
+    }
+
+    // 如果旧轨迹末端附近的点也已经在过去，
+    // 则不能再从旧轨迹采样，只能从当前 odom 状态开始。
+    startPos = curOdomPose.translation();
+    startVel = curOdomVel;
+    startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+    trajStartStamp = stamp;
 
     return true;
 }
@@ -317,7 +340,7 @@ Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPo
     Eigen::Vector3d diff = globalGoal - startPos;
     const double dist = diff.norm();
 
-    if (dist < 0.1) 
+    if (dist < config.sensingRadius-0.5) 
     {
         return globalGoal;
     }
@@ -601,8 +624,56 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         return false;
     }
 
+    route = trajGen.routeSimplify(route, config.spatialResolution);
+
     Eigen::Vector3d finVel = Eigen::Vector3d::Zero();
     Eigen::Vector3d finAcc = Eigen::Vector3d::Zero();
+    const bool localGoalIsGlobalGoal = ((goal - globalGoal).norm() < config.spatialResolution);
+    if (!localGoalIsGlobalGoal)
+    {
+        // 根据 route 末端切线方向设置局部轨迹终端速度
+        Eigen::Vector3d tangent = Eigen::Vector3d::Zero();
+        const Eigen::Vector3d routeEnd = route.back();
+        // 从 route 末端往前找一个与终点不重合的点，用于计算末端切线方向。
+        for (int i = static_cast<int>(route.size()) - 2; i >= 0; --i)
+        {
+            Eigen::Vector3d diff = routeEnd - route[i];
+
+            if (diff.norm() > 0.1)
+            {
+                tangent = diff.normalized();
+                break;
+            }
+        }
+        
+        if (tangent.norm() > 1e-3)
+        {
+            finVel = config.local_goal_speed * tangent.normalized();
+        }
+        else if (tangent.norm() < 1e-3)
+        {
+            // 如果 route 末端切线退化，则使用 goal - startPos 方向兜底。
+            Eigen::Vector3d diff = goal - startPos;
+
+            if (diff.norm() > 1e-3)
+            {
+                tangent = diff.normalized();
+            }
+        }
+        else if (tangent.norm() < 1e-3 && startVel.norm() > 1e-3)
+        {   
+            // 如果仍然退化，则使用当前起点速度方向兜底。
+            tangent = startVel.normalized();
+        }
+        else
+        {
+            // 最后仍无法确定方向，则设为零速度。
+            finVel = Eigen::Vector3d::Zero();
+        }
+    }
+    ROS_WARN("[planAndPublishLocalTraj] Terminal velocity set by route tangent: "
+             "vx=%.3f, vy=%.3f, vz=%.3f, speed=%.3f", finVel(0), finVel(1), finVel(2), finVel.norm());
+
     Trajectory traj = trajGen.generate(route, startVel, startAcc,
                                        finVel, finAcc,
                                        config.alg,

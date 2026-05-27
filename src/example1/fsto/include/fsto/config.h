@@ -51,6 +51,7 @@ struct Config
     double min_replan_interval;
     double emergency_stop_duration;
     double local_goal_sample_angle;
+    double local_goal_speed;
     int flight_mode;
     std::vector<double> preset_waypoints;
     double waypoint_reach_thresh;
@@ -94,6 +95,7 @@ struct Config
         nh_priv.getParam("Min_replan_interval", conf.min_replan_interval);
         nh_priv.getParam("Emergency_stop_duration", conf.emergency_stop_duration);
         nh_priv.getParam("Local_goal_sample_angle", conf.local_goal_sample_angle);
+        nh_priv.getParam("Local_goal_speed", conf.local_goal_speed);
         nh_priv.getParam("Flight_mode", conf.flight_mode);
         nh_priv.getParam("Preset_waypoints", conf.preset_waypoints);
         nh_priv.getParam("Waypoint_reach_thresh", conf.waypoint_reach_thresh);

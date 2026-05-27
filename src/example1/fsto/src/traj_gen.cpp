@@ -25,8 +25,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 {
     Trajectory traj;
 
-    route = routeSimplify(route, config.spatialResolution);     // 道格拉斯-普克（Douglas-Peucker）算法
-
     if (route.size() < 2 || (route[0] - route[1]).squaredNorm() < FLT_EPSILON)
     {
         return traj;
