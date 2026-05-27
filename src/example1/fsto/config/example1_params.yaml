@@ -17,9 +17,9 @@ OdomFrame:                  'odom'
 # Params
 UnitScaleInSI:               1.0
 
-R3SafeRadius:                0.40   # 控制 RRT 搜索路径与障碍物的安全距离
+R3SafeRadius:                0.45   # 控制 RRT 搜索路径与障碍物的安全距离
 
-BodySafeRadius:              0.30
+BodySafeRadius:              0.20
 
 SensingRadius:               4.0    # 局部感知半径 (米)
 
@@ -53,15 +53,15 @@ Epsilon:                     0.02
 Local_map_update_dt:         0.10   # 10Hz
 
 # Online replanning
-Replan_dt:                  0.80   # 周期性重规划间隔
-Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s 是否发生碰撞
+Replan_dt:                  1.00   # 周期性重规划间隔
+Collision_check_horizon:    2.00   # 检查当前轨迹未来 1.5s 是否发生碰撞
 Collision_check_dt:         0.10
-Local_goal_ratio:           0.80   # local goal = 0.8 * sensing radius
-Replan_time_ahead:          0.40   # 旧轨迹前向拼接点
+Local_goal_ratio:           1.40   # local goal = Local_goal_ratio * sensing radius；该参数大于1时 Collision_check_horizon
+Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
 Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
-Local_goal_sample_angle:    30.0   # degree 局部目标候选采样角度间隔
+Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
 
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理

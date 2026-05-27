@@ -236,7 +236,16 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
 
     if (!localMapPtr->safeQuery(localGoal, config.bodySafeRadius))
     {
-        ROS_WARN("[Replan] Selected local goal is unsafe. Skip replanning.");
+        ROS_WARN("[Replan] Selected local goal is unsafe.");
+
+        if (hasActiveTraj && checkCurrentTrajSafe(stamp))
+        {
+            ROS_WARN("[Replan] Keep executing old safe trajectory.");
+            return;
+        }
+
+        ROS_ERROR("[Replan] Unsafe local goal and current trajectory unsafe. Publish emergency stop.");
+        publishEmergencyStopTraj(stamp);
         return;
     }
 
@@ -619,7 +628,7 @@ void MavGlobalPlanner::updateWaypointMission()
 
     globalGoal = presetWaypoints[currentWaypointId];
     hasTarget = true;
-    hasActiveTraj = false;
+    // hasActiveTraj = false;
     lastReplanTime = ros::Time(0);
 
     ROS_WARN("[Waypoint] Next waypoint = %d / %lu",

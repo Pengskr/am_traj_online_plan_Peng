@@ -44,7 +44,7 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
         {            
             ROS_WARN("AM_traj planning Fails: tries > tryOut");
             // visualization.visualize(traj, route, ros::Time::now(), 1);   
-            // traj.clear();
+            traj.clear();
             break;
         }
 
@@ -190,8 +190,12 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj,
                 candLeft(2) = mid(2);
                 candRight(2) = mid(2);
 
-                const bool leftSafe = MapPtr->safeQuery(candLeft, config.r3SafeRadius);
-                const bool rightSafe = MapPtr->safeQuery(candRight, config.r3SafeRadius);
+                bool leftSafe = MapPtr->safeQuery(candLeft, config.r3SafeRadius) &&
+                segmentSafe(p0, candLeft, config.spatialResolution, config.r3SafeRadius) &&
+                segmentSafe(candLeft, p1, config.spatialResolution, config.r3SafeRadius);
+                bool rightSafe = MapPtr->safeQuery(candRight, config.r3SafeRadius) &&
+                segmentSafe(p0, candRight, config.spatialResolution, config.r3SafeRadius) &&
+                segmentSafe(candRight, p1, config.spatialResolution, config.r3SafeRadius);
 
                 if (leftSafe && rightSafe)
                 {
@@ -275,57 +279,66 @@ bool TrajGen::segmentSafe(const Eigen::Vector3d &a,
     return true;
 }
 
-// 经典的道格拉斯-普克（Douglas-Peucker）算法（或类似原理的递归路径简化方法），用于减少路径中的点数，同时保持路径形状的近似度在一个可接受的范围内。
-std::vector<Eigen::Vector3d> TrajGen::routeSimplify(const vector<Vector3d> &route, double resolution) const
+// 基于视线 Line of Sight 的路径简化。
+// 从当前点开始，尽可能连接到后方最远的可直连点。
+// 若 route[i] -> route[j] 线段安全，则删除 i 和 j 之间的所有中间点。
+std::vector<Eigen::Vector3d> TrajGen::routeSimplify(
+    const std::vector<Eigen::Vector3d> &route,
+    double resolution) const
 {
-    vector<Vector3d> subRoute;
-    if (route.size() == 1 || route.size() == 2)
+    std::vector<Eigen::Vector3d> simplified;
+
+    if (route.empty())
     {
-        subRoute = route;
+        return simplified;
     }
-    else if (route.size() >= 3)
+
+    if (route.size() <= 2)
     {
-        vector<Vector3d>::const_iterator maxIt;
-        double maxDist = -INFINITY, tempDist;
-        Vector3d vec((route.back() - route.front()).normalized());
+        return route;
+    }
 
-        for (auto it = route.begin() + 1; it != (route.end() - 1); it++)
-        {
-            tempDist = (*it - route.front() - vec.dot(*it - route.front()) * vec).norm();
-            if (maxDist < tempDist)
-            {
-                maxDist = tempDist;
-                maxIt = it;
-            }
-        }
+    simplified.reserve(route.size());
+    simplified.push_back(route.front());
 
-        if (maxDist > resolution)
+    size_t current_id = 0;
+    const size_t goal_id = route.size() - 1;
+
+    while (current_id < goal_id)
+    {
+        size_t next_id = current_id + 1;
+
+        // 从终点往回找，寻找从 current_id 能直连的最远点。
+        for (size_t j = goal_id; j > current_id; --j)
         {
-            subRoute.insert(subRoute.end(), route.begin(), maxIt + 1);
-            subRoute = routeSimplify(subRoute, resolution);
-            vector<Vector3d> tempRoute(maxIt, route.end());
-            tempRoute = routeSimplify(tempRoute, resolution);
-            subRoute.insert(subRoute.end(), tempRoute.begin() + 1, tempRoute.end());
-        }
-        else
-        {
-            if (segmentSafe(route.front(),
-                            route.back(),
-                            config.spatialResolution,
+            if (segmentSafe(route[current_id],
+                            route[j],
+                            resolution,
                             config.r3SafeRadius))
             {
-                subRoute.push_back(route.front());
-                subRoute.push_back(route.back());
-            }
-            else
-            {
-                // 如果直连线段不安全，则不要过度简化，保留原路径
-                subRoute = route;
+                next_id = j;
+                break;
             }
         }
+
+        // 理论上 next_id 至少是 current_id + 1。
+        // 这里做保护，避免异常情况下死循环。
+        if (next_id <= current_id)
+        {
+            ROS_WARN("[RouteSimplifyLOS] Failed to advance route index.");
+            break;
+        }
+
+        // 避免重复压入几乎相同的点。
+        if ((route[next_id] - simplified.back()).norm() > 1e-6)
+        {
+            simplified.push_back(route[next_id]);
+        }
+
+        current_id = next_id;
     }
 
-    return subRoute;
+    return simplified;
 }
 
 
