@@ -75,7 +75,7 @@ Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约
 # Flight mode
 # 1: click goal mode
 # 2: preset waypoint mode
-Flight_mode:                 1
+Flight_mode:                 2
 
 Waypoint_reach_thresh:       0.50
 

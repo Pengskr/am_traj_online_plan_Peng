@@ -617,7 +617,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                                                const ros::Time &trajStartStamp)
 {
     std::vector<Eigen::Vector3d> route;
-    
+
     double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
 
     if (!std::isfinite(rrt_cost) || route.size() <= 1)
@@ -635,16 +635,77 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     }
 
     route = trajGen.routeSimplify(route, config.spatialResolution);
+    if (route.size() <= 1)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Route invalid after LOS simplify.");
+        return false;
+    }
+
+    // ============================================================
+    // RRT 搜索耗时后，重新用当前 odom 修正 route 头部和轨迹初始状态
+    // ============================================================
+    Eigen::Vector3d trajStartPos = startPos;
+    Eigen::Vector3d trajStartVel = startVel;
+    Eigen::Vector3d trajStartAcc = startAcc;
+    ros::Time actualTrajStartStamp = trajStartStamp;
+
+    // 备份 RRT 原始 route，防止 repair 失败后 route 被部分修改
+    std::vector<Eigen::Vector3d> routeBeforeRepair = route;
+
+    bool repairSuccess = repairRouteFromCurrentOdom(route,
+                                                    trajStartPos,
+                                                    trajStartVel,
+                                                    trajStartAcc,
+                                                    actualTrajStartStamp);
+
+    if (!repairSuccess)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Route repair from current odom failed. "
+                 "Fallback to original route and original start state.");
+
+        route = routeBeforeRepair;
+
+        trajStartPos = startPos;
+        trajStartVel = startVel;
+        trajStartAcc = startAcc;
+        actualTrajStartStamp = trajStartStamp;
+
+        if (!route.empty() && (route.front() - trajStartPos).norm() > 1e-3)
+        {
+            route.front() = trajStartPos;
+        }
+    }
+
+    if (route.size() <= 1)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Route invalid after repair/fallback.");
+        return false;
+    }
+
+    const double global_goal_thresh =
+        std::max(config.spatialResolution, config.waypoint_reach_thresh);
+
+    const bool localGoalIsGlobalGoal =
+        ((goal - globalGoal).norm() < global_goal_thresh);
+
+    if (repairSuccess &&
+        (goal - trajStartPos).norm() < 0.2 &&
+        !localGoalIsGlobalGoal)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Local goal is too close after route repair.");
+        return false;
+    }
 
     Eigen::Vector3d finVel = Eigen::Vector3d::Zero();
     Eigen::Vector3d finAcc = Eigen::Vector3d::Zero();
-    const bool localGoalIsGlobalGoal = ((goal - globalGoal).norm() < config.spatialResolution);
+
     if (!localGoalIsGlobalGoal)
     {
         // 根据 route 末端切线方向设置局部轨迹终端速度
         Eigen::Vector3d tangent = Eigen::Vector3d::Zero();
         const Eigen::Vector3d routeEnd = route.back();
-        // 从 route 末端往前找一个与终点不重合的点，用于计算末端切线方向。
+
+        // 1. 从 route 末端往前找一个与终点不重合的点，用于计算末端切线方向。
         for (int i = static_cast<int>(route.size()) - 2; i >= 0; --i)
         {
             Eigen::Vector3d diff = routeEnd - route[i];
@@ -655,37 +716,43 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                 break;
             }
         }
-        
-        if (tangent.norm() > 1e-3)
-        {
-            finVel = config.local_goal_speed * tangent.normalized();
-        }
-        else if (tangent.norm() < 1e-3)
-        {
-            // 如果 route 末端切线退化，则使用 goal - startPos 方向兜底。
-            Eigen::Vector3d diff = goal - startPos;
 
+        // 2. 如果退化，使用 goal - trajStartPos
+        if (tangent.norm() < 1e-3)
+        {
+            Eigen::Vector3d diff = goal - trajStartPos;
             if (diff.norm() > 1e-3)
             {
                 tangent = diff.normalized();
             }
         }
-        else if (tangent.norm() < 1e-3 && startVel.norm() > 1e-3)
-        {   
-            // 如果仍然退化，则使用当前起点速度方向兜底。
-            tangent = startVel.normalized();
+
+        // 3. 如果仍退化，使用 trajStartVel
+        if (tangent.norm() < 1e-3 && trajStartVel.norm() > 1e-3)
+        {
+            tangent = trajStartVel.normalized();
+        }
+
+        // 4. 最后统一赋值
+        if (tangent.norm() > 1e-3)
+        {
+            finVel = config.local_goal_speed * tangent.normalized();
         }
         else
         {
-            // 最后仍无法确定方向，则设为零速度。
             finVel = Eigen::Vector3d::Zero();
         }
     }
-    ROS_WARN("[planAndPublishLocalTraj] Terminal velocity set by route tangent: "
-             "vx=%.3f, vy=%.3f, vz=%.3f, speed=%.3f", finVel(0), finVel(1), finVel(2), finVel.norm());
 
-    Trajectory traj = trajGen.generate(route, startVel, startAcc,
-                                       finVel, finAcc,
+    ROS_WARN("[planAndPublishLocalTraj] Terminal velocity set by route tangent: "
+             "vx=%.3f, vy=%.3f, vz=%.3f, speed=%.3f",
+             finVel(0), finVel(1), finVel(2), finVel.norm());
+
+    Trajectory traj = trajGen.generate(route,
+                                       trajStartVel,
+                                       trajStartAcc,
+                                       finVel,
+                                       finAcc,
                                        config.alg,
                                        visualization);
 
@@ -695,13 +762,13 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         return false;
     }
 
-    if (!shouldReplaceCurrentTraj(traj, trajStartStamp, odomStamp))
+    if (!shouldReplaceCurrentTraj(traj, actualTrajStartStamp, odomStamp))
     {
         return false;
     }
 
     quadrotor_msgs::PolynomialTrajectory trajMsg;
-    ros::Time mutableStamp = trajStartStamp;
+    ros::Time mutableStamp = actualTrajStartStamp;
 
     polynomialTrajConverter(traj, trajMsg, Eigen::Isometry3d::Identity(), mutableStamp);
 
@@ -709,10 +776,106 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     visualization.visualize(traj, route, ros::Time::now(), 1);
 
     currentTraj = traj;
-    currentTrajStartTime = trajStartStamp;
+    currentTrajStartTime = actualTrajStartStamp;
     hasActiveTraj = true;
 
-    ROS_WARN("[planAndPublishLocalTraj] New local trajectory published. Duration = %.3f", traj.getTotalDuration());
+    ROS_WARN("[planAndPublishLocalTraj] New local trajectory published. Duration = %.3f",
+             traj.getTotalDuration());
+
+    return true;
+}
+
+bool MavGlobalPlanner::repairRouteFromCurrentOdom(
+    std::vector<Eigen::Vector3d> &route,
+    Eigen::Vector3d &trajStartPos,
+    Eigen::Vector3d &trajStartVel,
+    Eigen::Vector3d &trajStartAcc,
+    ros::Time &trajStartStamp) const
+{
+    if (!odomInitialized || route.size() < 2)
+    {
+        return false;
+    }
+
+    const Eigen::Vector3d curPos = curOdomPose.translation();
+    const Eigen::Vector3d curVel = curOdomVel;
+    const Eigen::Vector3d curAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+
+    if (!localMapPtr->safeQuery(curPos, config.bodySafeRadius))
+    {
+        ROS_WARN("[repairRouteFromCurrentOdom] Current odom position is unsafe.");
+        return false;
+    }
+
+    // 从当前 odom 位置尝试直接连接到 route 中尽可能靠后的点。
+    // 找到后删除其前面的所有旧 route 点。
+    int connect_id = -1;
+
+    for (int j = static_cast<int>(route.size()) - 1; j >= 0; --j)
+    {
+        if (trajGen.segmentSafe(curPos,
+                                route[j],
+                                config.spatialResolution,
+                                config.r3SafeRadius))
+        {
+            connect_id = j;
+            break;
+        }
+    }
+
+    if (connect_id < 0)
+    {
+        ROS_WARN("[repairRouteFromCurrentOdom] Cannot connect current odom to any route point.");
+        return false;
+    }
+
+    std::vector<Eigen::Vector3d> repairedRoute;
+    repairedRoute.reserve(route.size() - connect_id + 1);
+
+    repairedRoute.push_back(curPos);
+
+    // 如果 curPos 已经非常接近 route[connect_id]，不要重复加入。
+    if ((route[connect_id] - curPos).norm() > 1e-3)
+    {
+        repairedRoute.push_back(route[connect_id]);
+    }
+
+    for (size_t k = static_cast<size_t>(connect_id + 1); k < route.size(); ++k)
+    {
+        if ((route[k] - repairedRoute.back()).norm() > 1e-3)
+        {
+            repairedRoute.push_back(route[k]);
+        }
+    }
+
+    if (repairedRoute.size() < 2)
+    {
+        ROS_WARN("[repairRouteFromCurrentOdom] Repaired route has less than 2 points.");
+        return false;
+    }
+
+    // 可选：只对修正后的短 route 再做一次 LOS 简化。
+    // 因为前缀已经被裁剪，点数通常很少，这一步开销较小。
+    repairedRoute = trajGen.routeSimplify(repairedRoute, config.spatialResolution);
+
+    if (repairedRoute.size() < 2)
+    {
+        ROS_WARN("[repairRouteFromCurrentOdom] Route invalid after LOS simplify.");
+        return false;
+    }
+
+    route = repairedRoute;
+
+    trajStartPos = curPos;
+    trajStartVel = curVel;
+    trajStartAcc = curAcc;
+    trajStartStamp = odomStamp;
+
+    ROS_WARN("[repairRouteFromCurrentOdom] connect_id=%d, repaired_route_size=%lu, "
+             "startVel=%.3f",
+             connect_id,
+             route.size(),
+             trajStartVel.norm());
 
     return true;
 }

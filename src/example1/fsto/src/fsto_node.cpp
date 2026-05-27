@@ -11,7 +11,10 @@ int main(int argc, char **argv)
     Config::loadParameters(config, nh_priv);
     MavGlobalPlanner glbPlanner(config, nh_);   // 包含话题订阅与发布
 
-    ros::spin();
+    ros::AsyncSpinner spinner(2);
+    spinner.start();
+
+    ros::waitForShutdown();
 
     return 0;
 }

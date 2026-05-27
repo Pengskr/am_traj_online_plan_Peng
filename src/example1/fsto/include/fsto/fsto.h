@@ -74,6 +74,12 @@ public:
                                  const Eigen::Vector3d &startAcc,
                                  const Eigen::Vector3d &goal,
                                  const ros::Time &stamp);
+    
+    bool repairRouteFromCurrentOdom(std::vector<Eigen::Vector3d> &route,
+                                Eigen::Vector3d &trajStartPos,
+                                Eigen::Vector3d &trajStartVel,
+                                Eigen::Vector3d &trajStartAcc,
+                                ros::Time &trajStartStamp) const;
 
     bool checkCurrentTrajSafe(const ros::Time &stamp) const;
 
