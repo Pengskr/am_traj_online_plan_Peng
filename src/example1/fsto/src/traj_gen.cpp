@@ -101,38 +101,19 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 // 采样检查轨迹安全性。
 // 若发现碰撞，每次仅在第一处碰撞段插入一个新航点，避免航点数量指数级增长。
 // 插入点优先选择线段法向偏移点，使 route 尽量远离障碍物边缘。
-bool TrajGen::trajSafeCheck(const Trajectory &traj,
-                            std::vector<Eigen::Vector3d> &route) const
+bool TrajGen::trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d> &route) const
 {
-    if (traj.getPieceNum() <= 0 || route.size() < 2)
-    {
-        ROS_WARN("[TrajSafeCheck] Empty trajectory or invalid route.");
-        return false;
-    }
-
-    if (static_cast<size_t>(traj.getPieceNum()) + 1 > route.size())
-    {
-        ROS_WARN("[TrajSafeCheck] traj piece number and route size mismatch. piece_num = %d, route_size = %lu",
-                 traj.getPieceNum(),
-                 route.size());
-        return false;
-    }
-
-    // 防止线段被无限二分。
-    // 后续可以改成 yaml 参数。
+    // 防止线段被无限二分, 后续可以改成 yaml 参数。
     const double min_insert_segment_length = 0.20;  // m
-    const double min_point_separation = 0.05;       // m
+    const double min_point_separation = 0.10;       // m
 
+    // 检查每一段
     for (int i = 0; i < traj.getPieceNum(); ++i)
     {
         const double duration = traj[i].getDuration();
-
-        const int step = std::max(
-            1,
-            static_cast<int>(std::ceil(duration / config.temporalResolution)));
-
+        const int step = std::max(1, static_cast<int>(std::ceil(duration / config.temporalResolution)));
         double t = 0.0;
-
+        // 检查时间采样点
         for (int j = 0; j < step - 1; ++j)
         {
             t += config.temporalResolution;
@@ -157,8 +138,7 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj,
 
             if (seg_len < min_insert_segment_length)
             {
-                ROS_WARN("[TrajSafeCheck] Collision segment too short for further insertion. len = %.3f",
-                         seg_len);
+                ROS_WARN("[TrajSafeCheck] Collision segment too short for further insertion. len = %.3f", seg_len);
                 return false;
             }
 
@@ -173,7 +153,7 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj,
             Eigen::Vector3d dir = seg;
             dir(2) = 0.0;
 
-            if (dir.norm() > 1e-3)
+            if (dir.norm() > 0.1)
             {
                 dir.normalize();
 
@@ -230,23 +210,17 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj,
             }
 
             // 防止插入点和原端点过近。
-            if ((insertPt - p0).norm() < min_point_separation ||
-                (insertPt - p1).norm() < min_point_separation)
+            if ((insertPt - p0).norm() < min_point_separation || (insertPt - p1).norm() < min_point_separation)
             {
                 ROS_WARN("[TrajSafeCheck] Insert point too close to segment endpoint.");
                 return false;
             }
 
             route.insert(route.begin() + i + 1, insertPt);
-
-            ROS_WARN("[TrajSafeCheck] Collision at piece %d. Insert one waypoint. route_size = %lu",
-                     i,
-                     route.size());
-
+            ROS_WARN("[TrajSafeCheck] Collision at piece %d. Insert one waypoint. route_size = %lu", i, route.size());
             return false;
         }
     }
-
     return true;
 }
 

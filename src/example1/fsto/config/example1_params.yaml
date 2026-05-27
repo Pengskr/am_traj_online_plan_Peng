@@ -17,7 +17,7 @@ OdomFrame:                  'odom'
 # Params
 UnitScaleInSI:               1.0
 
-R3SafeRadius:                0.45   # 控制 RRT 搜索路径与障碍物的安全距离
+R3SafeRadius:                0.40   # 控制 RRT 搜索路径与障碍物的安全距离
 
 BodySafeRadius:              0.20
 
