@@ -181,18 +181,19 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     bool needReplan = false;
     bool urgentReplan = false;
 
+    // 刚启动，没有轨迹，需规划
     if (!hasActiveTraj)
     {
         needReplan = true;
     }
-
+    // 当前时刻 Collision_check_horizon 内发生碰撞需重规划
     if (hasActiveTraj && !checkCurrentTrajSafe(stamp))
     {
         ROS_WARN("[Replan] Current trajectory is unsafe.");
         needReplan = true;
         urgentReplan = true;
     }
-
+    // 轨迹剩余时间不足需要初始化
     if (hasActiveTraj)
     {
         const double t_now = (stamp - currentTrajStartTime).toSec();
@@ -203,24 +204,24 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
             needReplan = true;
         }
     }
-
-    if ((stamp - lastReplanTime).toSec() > config.replan_dt)
-    {
-        needReplan = true;
-    }
+    // // 达到设置的重规划周期需要初始化
+    // if ((stamp - lastReplanTime).toSec() > config.replan_dt)
+    // {
+    //     needReplan = true;
+    // }
 
     if (!needReplan)
     {
         return;
     }
 
-    // 冷却机制：非紧急重规划不能过于频繁发布新轨迹
-    if (!urgentReplan &&
-        hasActiveTraj &&
-        (stamp - lastReplanTime).toSec() < config.min_replan_interval)
-    {
-        return;
-    }
+    // // 冷却机制：非紧急重规划不能过于频繁发布新轨迹
+    // if (!urgentReplan &&
+    //     hasActiveTraj &&
+    //     (stamp - lastReplanTime).toSec() < config.min_replan_interval)
+    // {
+    //     return;
+    // }
 
     Eigen::Vector3d startPos, startVel, startAcc;
     ros::Time trajStartStamp;
