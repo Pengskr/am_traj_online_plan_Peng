@@ -204,7 +204,19 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
         }
     }
 
-    if ((stamp - lastReplanTime).toSec() > config.replan_dt)
+    // 周期重规划只在执行时间已经超过轨迹一定比例后触发
+    if (hasActiveTraj)
+    {
+        const double t_now = (stamp - currentTrajStartTime).toSec();
+        const double totalT = currentTraj.getTotalDuration();
+        const double progress = totalT > 1e-3 ? t_now / totalT : 1.0;
+
+        if ((stamp - lastReplanTime).toSec() > config.replan_dt && progress > 0.35)
+        {
+            needReplan = true;
+        }
+    }
+    else
     {
         needReplan = true;
     }
@@ -481,6 +493,60 @@ bool MavGlobalPlanner::isTrajectorySafe(const Trajectory &traj,
     return true;
 }
 
+bool MavGlobalPlanner::shouldReplaceCurrentTraj(const Trajectory &newTraj,
+                                                const ros::Time &newTrajStartStamp,
+                                                const ros::Time &stamp) const
+{
+    if (!hasActiveTraj || currentTraj.getPieceNum() <= 0)
+    {
+        return true;
+    }
+
+    // 如果旧轨迹已经不安全，必须替换
+    if (!checkCurrentTrajSafe(stamp))
+    {
+        return true;
+    }
+
+    const double compare_horizon = 0.8;
+    const double compare_dt = 0.1;
+
+    double max_pos_diff = 0.0;
+    double max_vel_diff = 0.0;
+
+    for (double tau = 0.0; tau <= compare_horizon; tau += compare_dt)
+    {
+        double t_old = (newTrajStartStamp + ros::Duration(tau) - currentTrajStartTime).toSec();
+        double t_new = tau;
+
+        if (t_old < 0.0 ||
+            t_old > currentTraj.getTotalDuration() ||
+            t_new > newTraj.getTotalDuration())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d p_old = currentTraj.getPos(t_old);
+        Eigen::Vector3d v_old = currentTraj.getVel(t_old);
+
+        Eigen::Vector3d p_new = newTraj.getPos(t_new);
+        Eigen::Vector3d v_new = newTraj.getVel(t_new);
+
+        max_pos_diff = std::max(max_pos_diff, (p_new - p_old).norm());
+        max_vel_diff = std::max(max_vel_diff, (v_new - v_old).norm());
+    }
+
+    // 阈值可后续参数化
+    if (max_pos_diff > 1.0 || max_vel_diff > 1.5)
+    {
+        ROS_WARN("[Replan] Reject new trajectory: too different from old safe trajectory. pos_diff=%.2f vel_diff=%.2f",
+                 max_pos_diff, max_vel_diff);
+        return false;
+    }
+
+    return true;
+}
+
 void MavGlobalPlanner::startPresetWaypointMission()
 {
     if (presetWaypoints.empty())
@@ -609,6 +675,11 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     if (!isTrajectorySafe(traj, trajStartStamp, trajStartStamp))
     {
         ROS_WARN("[Replan] New trajectory is not safe.");
+        return false;
+    }
+
+    if (!shouldReplaceCurrentTraj(traj, trajStartStamp, odomStamp))
+    {
         return false;
     }
 

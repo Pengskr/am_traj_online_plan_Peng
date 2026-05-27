@@ -101,6 +101,10 @@ public:
                           const ros::Time &trajStartStamp,
                           const ros::Time &stamp) const;
 
+    bool shouldReplaceCurrentTraj(const Trajectory &newTraj,
+                                  const ros::Time &newTrajStartStamp,
+                                  const ros::Time &stamp) const;
+
     std::shared_ptr<PriorGlobalMap> glbMapPtr;    // 先验全局地图
     std::shared_ptr<LocalPerceptionMap> localMapPtr;  // 当前局部感知地图
     R3Planner r3planner;
