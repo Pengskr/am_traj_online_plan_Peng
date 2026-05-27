@@ -107,6 +107,13 @@ public:
     TrajGen trajGen;
     Visualization visualization;
     ReplanState replanState;
+
+    // ===== Flight mode / waypoint mission =====
+    std::vector<Eigen::Vector3d> presetWaypoints;
+    int currentWaypointId;
+    void initPresetWaypoints();
+    void startPresetWaypointMission();
+    void updateWaypointMission();
 };
 
 #endif
