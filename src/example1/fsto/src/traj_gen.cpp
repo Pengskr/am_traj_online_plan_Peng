@@ -37,6 +37,10 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
     {
         clock_t start = clock();
 
+        // 每轮重新优化前，都对当前 route 做一次 LOS shortcut。
+        // 这样 trajSafeCheck 插入的冗余折点如果可以被直连，会被删除。
+        route = routeSimplify(route, config.spatialResolution);
+
         tries++;
         if (tries > config.tryOut)  // 超过最大规划次数
         {            
