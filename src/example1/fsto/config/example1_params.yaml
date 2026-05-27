@@ -19,9 +19,9 @@ UnitScaleInSI:               1.0
 
 R3SafeRadius:                0.40   # 控制 RRT 搜索路径与障碍物的安全距离
 
-BodySafeRadius:              0.20
+BodySafeRadius:              0.30
 
-SensingRadius:               4.0    # 局部感知半径 (米)
+SensingRadius:               5.0    # 局部感知半径 (米)
 
 EdfResolution:               0.10
 
@@ -32,7 +32,9 @@ SearchDuration:              0.10
 
 # R3Planner direction constraint
 R3_direction_min_vel:             0.20   # m/s，低于该速度时不启用方向约束：当前速度低于该值时，认为无人机近似静止，不约束 RRT 初始方向。
+
 R3_direction_constraint_radius:   1.20   # m，只约束起点附近的边：只在 startPos 附近该半径内约束边方向，避免限制后续绕障能力。
+
 R3_max_initial_turn_angle:        60.0   # deg，允许的最大初始转向角:RRT 起始边与当前速度方向允许的最大夹角。
 
 TryOut:                      5
@@ -41,7 +43,7 @@ MaxAccRate:                  2.00
 
 MaxVelRate:                  4.00
 
-WeightT:                     128.0
+WeightT:                     1024.0
 
 WeightAcc:                   0.0
 
@@ -63,7 +65,7 @@ Collision_check_horizon:    2.00   # 检查当前轨迹未来 1.5s 是否发生�
 Collision_check_dt:         0.10
 Local_goal_ratio:           1.40   # local goal = Local_goal_ratio * sensing radius；该参数大于1时 Collision_check_horizon
 Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
-Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
+Min_traj_remaining_time:    2.00   # 当前轨迹剩余时间不足时强制重规划
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
