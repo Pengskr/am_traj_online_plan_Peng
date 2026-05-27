@@ -167,7 +167,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
         return;
     }
 
-    const Eigen::Vector3d curPos = curOdomPose.translation();
+    // const Eigen::Vector3d curPos = curOdomPose.translation();
 
     if (config.flight_mode == 1 &&
         (globalGoal - curOdomPose.translation()).norm() < config.waypoint_reach_thresh)
@@ -234,6 +234,12 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
 
     const Eigen::Vector3d localGoal = selectLocalGoal(startPos);
 
+    if (!localMapPtr->safeQuery(localGoal, config.bodySafeRadius))
+    {
+        ROS_WARN("[Replan] Selected local goal is unsafe. Skip replanning.");
+        return;
+    }
+
     const bool success = planAndPublishLocalTraj(startPos,
                                                 startVel,
                                                 startAcc,
@@ -260,12 +266,21 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     publishEmergencyStopTraj(stamp);
 }
 
+/*
+1. 如果全局目标很近，直接返回全局目标；
+2. 否则沿全局目标方向选一个前视局部目标 nominal；
+3. 如果 nominal 安全，直接返回 nominal；
+4. 如果 nominal 不安全，则在水平面左右采样多个候选点；
+5. 只保留安全候选点；
+6. 从安全候选点中选择“离全局目标近且偏转角小”的点；
+7. 返回该点作为局部重规划目标。
+*/
 Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPos) const
 {
     Eigen::Vector3d diff = globalGoal - startPos;
     const double dist = diff.norm();
 
-    if (dist < 1e-3)
+    if (dist < 0.1) 
     {
         return globalGoal;
     }
@@ -273,7 +288,7 @@ Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPo
     const double localGoalDist =
         std::min(dist, config.local_goal_ratio * config.sensingRadius);
 
-    Eigen::Vector3d dir = diff.normalized();
+    Eigen::Vector3d dir = diff.normalized();    // 指向全局目标的单位方向
 
     auto clampZ = [&](Eigen::Vector3d p) {
         p(2) = std::max(config.r3Bound[4] + config.r3SafeRadius,
@@ -281,10 +296,10 @@ Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPo
         return p;
     };
 
+    // 先尝试直线前视局部目标
     Eigen::Vector3d nominal = startPos + dir * localGoalDist;
     nominal(2) = globalGoal(2);
     nominal = clampZ(nominal);
-
     if (localMapPtr->safeQuery(nominal, config.bodySafeRadius))
     {
         return nominal;
@@ -337,6 +352,15 @@ Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPo
     return bestGoal;
 }
 
+/*
+如果当前没有旧轨迹：
+    从当前 odom 状态开始规划。
+
+如果当前已有旧轨迹：
+    不直接从当前 odom 状态开始；
+    而是从旧轨迹未来某个时间点开始规划，
+    使新轨迹和旧轨迹在拼接点处保持 p、v、a 连续。
+*/
 bool MavGlobalPlanner::getReplanStartState(const ros::Time &stamp,
                                            Eigen::Vector3d &startPos,
                                            Eigen::Vector3d &startVel,
@@ -482,6 +506,63 @@ bool MavGlobalPlanner::isTrajectorySafe(const Trajectory &traj,
     return true;
 }
 
+bool MavGlobalPlanner::shouldReplaceCurrentTraj(
+    const Trajectory &newTraj,
+    const ros::Time &newTrajStartStamp,
+    const ros::Time &stamp) const
+{
+    if (!hasActiveTraj || currentTraj.getPieceNum() <= 0)
+    {
+        return true;
+    }
+
+    // 如果旧轨迹已经不安全，则允许替换
+    if (!checkCurrentTrajSafe(stamp))
+    {
+        return true;
+    }
+
+    const double compare_horizon = 0.8;
+    const double compare_dt = 0.1;
+
+    double max_pos_diff = 0.0;
+    double max_vel_diff = 0.0;
+
+    for (double tau = 0.0; tau <= compare_horizon; tau += compare_dt)
+    {
+        double t_old =
+            (newTrajStartStamp + ros::Duration(tau) - currentTrajStartTime).toSec();
+
+        double t_new = tau;
+
+        if (t_old < 0.0 ||
+            t_old > currentTraj.getTotalDuration() ||
+            t_new > newTraj.getTotalDuration())
+        {
+            continue;
+        }
+
+        Eigen::Vector3d p_old = currentTraj.getPos(t_old);
+        Eigen::Vector3d v_old = currentTraj.getVel(t_old);
+
+        Eigen::Vector3d p_new = newTraj.getPos(t_new);
+        Eigen::Vector3d v_new = newTraj.getVel(t_new);
+
+        max_pos_diff = std::max(max_pos_diff, (p_new - p_old).norm());
+        max_vel_diff = std::max(max_vel_diff, (v_new - v_old).norm());
+    }
+
+    if (max_pos_diff > 1.0 || max_vel_diff > 1.5)
+    {
+        ROS_WARN("[Replan] Reject new trajectory: too different from old safe trajectory. pos_diff=%.2f vel_diff=%.2f",
+                 max_pos_diff,
+                 max_vel_diff);
+        return false;
+    }
+
+    return true;
+}
+
 void MavGlobalPlanner::startPresetWaypointMission()
 {
     if (presetWaypoints.empty())
@@ -603,13 +684,6 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     if (traj.getPieceNum() <= 0)
     {
         ROS_WARN("[Replan] TrajGen failed.");
-        return false;
-    }
-
-    // 新轨迹自身再做一次短窗口安全确认
-    if (!isTrajectorySafe(traj, trajStartStamp, trajStartStamp))
-    {
-        ROS_WARN("[Replan] New trajectory is not safe.");
         return false;
     }
 

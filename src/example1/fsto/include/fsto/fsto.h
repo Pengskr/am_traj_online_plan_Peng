@@ -21,16 +21,6 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-enum class ReplanState
-{
-    INIT,
-    WAIT_TARGET,
-    EXEC_TRAJ,
-    REPLAN_TRAJ,
-    EMERGENCY_STOP
-};
-
-
 class MavGlobalPlanner
 {
 public:
@@ -110,7 +100,6 @@ public:
     R3Planner r3planner;
     TrajGen trajGen;
     Visualization visualization;
-    ReplanState replanState;
 
     // ===== Flight mode / waypoint mission =====
     std::vector<Eigen::Vector3d> presetWaypoints;

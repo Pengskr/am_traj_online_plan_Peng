@@ -17,7 +17,7 @@ OdomFrame:                  'odom'
 # Params
 UnitScaleInSI:               1.0
 
-R3SafeRadius:                0.40
+R3SafeRadius:                0.40   # 控制 RRT 搜索路径与障碍物的安全距离
 
 BodySafeRadius:              0.30
 
@@ -30,7 +30,7 @@ R3Bound:                     [-10.0, 10.0, -10.0, 10.0, 0.0, 5.0]
 
 SearchDuration:              0.10
 
-TryOut:                      10
+TryOut:                      5
 
 MaxAccRate:                  2.00
 
@@ -57,21 +57,21 @@ Replan_dt:                  0.80   # 周期性重规划间隔
 Collision_check_horizon:    1.50   # 检查当前轨迹未来 1.5s 是否发生碰撞
 Collision_check_dt:         0.10
 Local_goal_ratio:           0.80   # local goal = 0.8 * sensing radius
-Replan_time_ahead:          0.25   # 旧轨迹前向拼接点
+Replan_time_ahead:          0.40   # 旧轨迹前向拼接点
 Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    30.0   # degree 局部目标候选采样角度间隔
 
 # 算法选择
-Alg:                         2      # 2 - 时域缩放； 3 - 精细化局部约束处理
+Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
 
 # Flight mode
 # 1: click goal mode
 # 2: preset waypoint mode
 Flight_mode:                 2
 
-Waypoint_reach_thresh:       0.20
+Waypoint_reach_thresh:       0.50
 
 # x1, y1, z1, x2, y2, z2, ...
 Preset_waypoints:            [

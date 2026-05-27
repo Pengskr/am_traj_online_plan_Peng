@@ -32,7 +32,7 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
         return traj;
     }
 
-    std::string result_dir = "/home/peng/Desktop/am_traj_Peng/src/example1/results/";
+    // std::string result_dir = "/home/peng/Desktop/am_traj_Peng/src/example1/results/";
 
     int tries = 0;
     do
@@ -43,8 +43,8 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
         if (tries > config.tryOut)  // 超过最大规划次数
         {            
             ROS_WARN("AM_traj planning Fails: tries > tryOut");
-            visualization.visualize(traj, route, ros::Time::now(), 1);   
-            traj.clear();
+            // visualization.visualize(traj, route, ros::Time::now(), 1);   
+            // traj.clear();
             break;
         }
 
@@ -98,38 +98,152 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 }
 
 // 采样检查轨迹安全性，在发生碰撞的段中间加入新航点 
-bool TrajGen::trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d> &route) const
+// 采样检查轨迹安全性。
+// 若发现碰撞，每次仅在第一处碰撞段插入一个新航点，避免航点数量指数级增长。
+// 插入点优先选择线段法向偏移点，使 route 尽量远离障碍物边缘。
+bool TrajGen::trajSafeCheck(const Trajectory &traj,
+                            std::vector<Eigen::Vector3d> &route) const
 {
-    bool safe = true;
-
-    vector<Vector3d> discretePoints;
-
-    double t;
-    int step;
-    Vector3d tempTranslation;
-    bool tempSafe;
-    for (int i = 0; i < traj.getPieceNum(); i++)
+    if (traj.getPieceNum() <= 0 || route.size() < 2)
     {
-        step = traj[i].getDuration() / config.temporalResolution;
-        t = 0.0;
-        discretePoints.push_back(route[i]);
-        for (int j = 0; j < step - 1; j++)
+        ROS_WARN("[TrajSafeCheck] Empty trajectory or invalid route.");
+        return false;
+    }
+
+    if (static_cast<size_t>(traj.getPieceNum()) + 1 > route.size())
+    {
+        ROS_WARN("[TrajSafeCheck] traj piece number and route size mismatch. piece_num = %d, route_size = %lu",
+                 traj.getPieceNum(),
+                 route.size());
+        return false;
+    }
+
+    // 防止线段被无限二分。
+    // 后续可以改成 yaml 参数。
+    const double min_insert_segment_length = 0.20;  // m
+    const double min_point_separation = 0.05;       // m
+
+    for (int i = 0; i < traj.getPieceNum(); ++i)
+    {
+        const double duration = traj[i].getDuration();
+
+        const int step = std::max(
+            1,
+            static_cast<int>(std::ceil(duration / config.temporalResolution)));
+
+        double t = 0.0;
+
+        for (int j = 0; j < step - 1; ++j)
         {
             t += config.temporalResolution;
-            tempTranslation = traj[i].getPos(t);
-            tempSafe = MapPtr->safeQuery(tempTranslation, config.bodySafeRadius);
-            safe &= tempSafe;
-            if (!tempSafe)
+
+            const Eigen::Vector3d pos = traj[i].getPos(t);
+
+            // 当前采样点安全，则继续检查该 piece 后续采样点。
+            if (MapPtr->safeQuery(pos, config.bodySafeRadius))
             {
-                discretePoints.push_back((route[i] + route[i + 1]) / 2.0);  // 两点中间插入新点
-                break;
+                continue;
             }
+
+            // ============================================================
+            // 发现第一处碰撞：只处理这一处，然后立即 return false。
+            // 这样一次 trajSafeCheck() 最多只增加一个航点。
+            // ============================================================
+            const Eigen::Vector3d p0 = route[i];
+            const Eigen::Vector3d p1 = route[i + 1];
+
+            const Eigen::Vector3d seg = p1 - p0;
+            const double seg_len = seg.norm();
+
+            if (seg_len < min_insert_segment_length)
+            {
+                ROS_WARN("[TrajSafeCheck] Collision segment too short for further insertion. len = %.3f",
+                         seg_len);
+                return false;
+            }
+
+            const Eigen::Vector3d mid = 0.5 * (p0 + p1);
+
+            Eigen::Vector3d insertPt = mid;
+
+            // ============================================================
+            // 优先尝试水平面左右法向偏移点。
+            // 这样比简单插中点更可能把 route 推离障碍物边缘。
+            // ============================================================
+            Eigen::Vector3d dir = seg;
+            dir(2) = 0.0;
+
+            if (dir.norm() > 1e-3)
+            {
+                dir.normalize();
+
+                const Eigen::Vector3d left(-dir(1), dir(0), 0.0);
+                const Eigen::Vector3d right(dir(1), -dir(0), 0.0);
+
+                // 偏移距离：至少取 r3SafeRadius，也给一个 0.5m 的下限。
+                const double offset = std::max(config.r3SafeRadius, 0.50);
+
+                Eigen::Vector3d candLeft = mid + offset * left;
+                Eigen::Vector3d candRight = mid + offset * right;
+
+                // 保持高度不变，先只在水平面绕障。
+                candLeft(2) = mid(2);
+                candRight(2) = mid(2);
+
+                const bool leftSafe = MapPtr->safeQuery(candLeft, config.r3SafeRadius);
+                const bool rightSafe = MapPtr->safeQuery(candRight, config.r3SafeRadius);
+
+                if (leftSafe && rightSafe)
+                {
+                    // 两侧都安全时，选择更接近终点的一侧。
+                    if ((candLeft - route.back()).norm() <
+                        (candRight - route.back()).norm())
+                    {
+                        insertPt = candLeft;
+                    }
+                    else
+                    {
+                        insertPt = candRight;
+                    }
+                }
+                else if (leftSafe)
+                {
+                    insertPt = candLeft;
+                }
+                else if (rightSafe)
+                {
+                    insertPt = candRight;
+                }
+                else
+                {
+                    // 左右偏移都不安全，退化为中点。
+                    insertPt = mid;
+                }
+            }
+            else
+            {
+                insertPt = mid;
+            }
+
+            // 防止插入点和原端点过近。
+            if ((insertPt - p0).norm() < min_point_separation ||
+                (insertPt - p1).norm() < min_point_separation)
+            {
+                ROS_WARN("[TrajSafeCheck] Insert point too close to segment endpoint.");
+                return false;
+            }
+
+            route.insert(route.begin() + i + 1, insertPt);
+
+            ROS_WARN("[TrajSafeCheck] Collision at piece %d. Insert one waypoint. route_size = %lu",
+                     i,
+                     route.size());
+
+            return false;
         }
     }
-    discretePoints.push_back(route[traj.getPieceNum()]);
-    route = discretePoints;
 
-    return safe;
+    return true;
 }
 
 bool TrajGen::segmentSafe(const Eigen::Vector3d &a,

@@ -32,7 +32,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: GlobalMap
+    SyncSource: LocalInflateMap
   - Class: rviz/Displays
     Help Height: 78
     Name: Displays
@@ -161,7 +161,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.349999904632568
+            Max Value: 3.8499999046325684
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -193,7 +193,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        trajectory: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -201,7 +201,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/waypoints
       Name: Waypoints
       Namespaces:
-        waypoints: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -209,7 +209,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/route
       Name: Path
       Namespaces:
-        route: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
@@ -240,22 +240,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 24.27411651611328
+      Distance: 30.810752868652344
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.3072468042373657
-        Y: -8.491299629211426
-        Z: 1.1862077713012695
+        X: 3.2689225673675537
+        Y: -6.564650535583496
+        Z: 1.186202049255371
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0247968435287476
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: ThirdPersonFollower (rviz)
       Yaw: 4.711568832397461
