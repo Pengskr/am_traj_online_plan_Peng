@@ -8,7 +8,7 @@
 <arg name="map_size_z" default="5.0"/>
 
 <!-- Initial position of the drone -->
-<arg name="init_x" default="-9"/>
+<arg name="init_x" default="1"/>
 <arg name="init_y" default="-9"/>
 <arg name="init_z" default=" 0.0"/>
 

@@ -8,7 +8,9 @@ using namespace Eigen;
 MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
     : config(conf), nh(nh_), odomInitialized(false),
       accInitialized(false), mapInitialized(false), localMapInitialized(false),
-      hasTarget(false), hasActiveTraj(false), replanState(ReplanState::INIT),
+      hasTarget(false),
+      hasActiveTraj(false),
+      currentWaypointId(0),
       lastReplanTime(ros::Time(0)),
       glbMapPtr(make_shared<PriorGlobalMap>(config)),
       localMapPtr(make_shared<LocalPerceptionMap>(config)),
@@ -31,6 +33,8 @@ MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
     autoManualPub = nh.advertise<sensor_msgs::Joy>(config.autoManualTopic, 1);
     inflate_map_pub = nh.advertise<sensor_msgs::PointCloud2>(config.inflateMapTopic, 1);
     odomStamp = Time::now();
+
+    initPresetWaypoints();
 }
 
 MavGlobalPlanner::~MavGlobalPlanner()
@@ -71,7 +75,11 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
 
         last_local_map_update_time = msg->header.stamp;
 
-        // 新增：局部地图更新后检查是否需要重规划
+        if (config.flight_mode == 2)
+        {
+            updateWaypointMission();
+        }
+
         if (hasTarget)
         {
             tryReplan(msg->header.stamp);
@@ -115,6 +123,14 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
         return;
     }
 
+    if (config.flight_mode == 2)
+    {
+        ROS_WARN("[Waypoint] Click trigger received. Start preset waypoint mission.");
+        startPresetWaypointMission();
+        return;
+    }
+
+    // mode 1: click goal mode
     double zGoal = fabs(msg->pose.orientation.z) *
                        (config.r3Bound[5] - config.r3Bound[4] - 2 * config.r3SafeRadius) +
                    config.r3Bound[4] + config.r3SafeRadius;
@@ -124,7 +140,10 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
                                  zGoal);
 
     hasTarget = true;
-    ROS_WARN("[Replan] New global goal received.");
+    hasActiveTraj = false;
+    lastReplanTime = ros::Time(0);
+
+    ROS_WARN("[Replan] New clicked global goal received.");
 
     tryReplan(odomStamp);
 }
@@ -150,10 +169,12 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
 
     const Eigen::Vector3d curPos = curOdomPose.translation();
 
-    if ((globalGoal - curPos).norm() < 0.1)
+    if (config.flight_mode == 1 &&
+        (globalGoal - curOdomPose.translation()).norm() < config.waypoint_reach_thresh)
     {
         ROS_WARN("[Replan] Global goal reached.");
         hasTarget = false;
+        hasActiveTraj = false;
         return;
     }
 
@@ -458,6 +479,97 @@ bool MavGlobalPlanner::isTrajectorySafe(const Trajectory &traj,
     }
 
     return true;
+}
+
+void MavGlobalPlanner::startPresetWaypointMission()
+{
+    if (presetWaypoints.empty())
+    {
+        ROS_ERROR("[Waypoint] No preset waypoints.");
+        return;
+    }
+
+    currentWaypointId = 0;
+    globalGoal = presetWaypoints[currentWaypointId];
+    hasTarget = true;
+    hasActiveTraj = false;
+    lastReplanTime = ros::Time(0);
+
+    ROS_WARN("[Waypoint] Start mission. Current waypoint = %d / %lu",
+             currentWaypointId + 1,
+             presetWaypoints.size());
+
+    tryReplan(odomStamp);
+}
+
+void MavGlobalPlanner::updateWaypointMission()
+{
+    if (config.flight_mode != 2)
+    {
+        return;
+    }
+
+    if (!hasTarget || presetWaypoints.empty())
+    {
+        return;
+    }
+
+    Eigen::Vector3d curPos = curOdomPose.translation();
+
+    if ((curPos - globalGoal).norm() > config.waypoint_reach_thresh)
+    {
+        return;
+    }
+
+    ROS_WARN("[Waypoint] Reached waypoint %d / %lu",
+             currentWaypointId + 1,
+             presetWaypoints.size());
+
+    currentWaypointId++;
+
+    if (currentWaypointId >= static_cast<int>(presetWaypoints.size()))
+    {
+        ROS_WARN("[Waypoint] Mission completed.");
+        hasTarget = false;
+        hasActiveTraj = false;
+        return;
+    }
+
+    globalGoal = presetWaypoints[currentWaypointId];
+    hasTarget = true;
+    hasActiveTraj = false;
+    lastReplanTime = ros::Time(0);
+
+    ROS_WARN("[Waypoint] Next waypoint = %d / %lu",
+             currentWaypointId + 1,
+             presetWaypoints.size());
+
+    tryReplan(odomStamp);
+}
+
+void MavGlobalPlanner::initPresetWaypoints()
+{
+    presetWaypoints.clear();
+
+    if (config.preset_waypoints.size() % 3 != 0)
+    {
+        ROS_ERROR("[Waypoint] Preset_waypoints size must be multiple of 3.");
+        return;
+    }
+
+    for (size_t i = 0; i + 2 < config.preset_waypoints.size(); i += 3)
+    {
+        Eigen::Vector3d p(config.preset_waypoints[i],
+                          config.preset_waypoints[i + 1],
+                          config.preset_waypoints[i + 2]);
+
+        p(2) = std::max(config.r3Bound[4] + config.r3SafeRadius,
+                        std::min(config.r3Bound[5] - config.r3SafeRadius, p(2)));
+
+        presetWaypoints.push_back(p);
+    }
+
+    ROS_WARN("[Waypoint] Loaded %lu preset waypoints.", presetWaypoints.size());
 }
 
 bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,

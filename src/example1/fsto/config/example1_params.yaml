@@ -65,3 +65,18 @@ Local_goal_sample_angle:    30.0   # degree 局部目标候选采样角度间隔
 
 # 算法选择
 Alg:                         2      # 2 - 时域缩放； 3 - 精细化局部约束处理
+
+# Flight mode
+# 1: click goal mode
+# 2: preset waypoint mode
+Flight_mode:                 2
+
+Waypoint_reach_thresh:       0.20
+
+# x1, y1, z1, x2, y2, z2, ...
+Preset_waypoints:            [
+                              -9.0, 0.0, 2.0,
+                               0.0, 9.0, 3.0,
+                               9.0, -1.0, 2.0,
+                               1.0, -9.0, 2.0
+                             ]

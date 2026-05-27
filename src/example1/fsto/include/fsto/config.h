@@ -51,6 +51,9 @@ struct Config
     double min_replan_interval;
     double emergency_stop_duration;
     double local_goal_sample_angle;
+    int flight_mode;
+    std::vector<double> preset_waypoints;
+    double waypoint_reach_thresh;
     double alg;
 
     static void loadParameters(Config &conf, const ros::NodeHandle &nh_priv)
@@ -91,6 +94,9 @@ struct Config
         nh_priv.getParam("Min_replan_interval", conf.min_replan_interval);
         nh_priv.getParam("Emergency_stop_duration", conf.emergency_stop_duration);
         nh_priv.getParam("Local_goal_sample_angle", conf.local_goal_sample_angle);
+        nh_priv.getParam("Flight_mode", conf.flight_mode);
+        nh_priv.getParam("Preset_waypoints", conf.preset_waypoints);
+        nh_priv.getParam("Waypoint_reach_thresh", conf.waypoint_reach_thresh);
         nh_priv.getParam("Alg", conf.alg);
     }
 };
