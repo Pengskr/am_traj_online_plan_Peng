@@ -161,7 +161,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 3.8499999046325684
+            Max Value: 5.349999904632568
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -193,7 +193,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        {}
+        trajectory: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -201,17 +201,17 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/waypoints
       Name: Waypoints
       Namespaces:
-        {}
+        waypoints: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
-      Enabled: false
+      Enabled: true
       Marker Topic: /fsto/visualization/route
       Name: Path
       Namespaces:
-        {}
+        route: true
       Queue Size: 100
-      Value: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255

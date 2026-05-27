@@ -36,7 +36,7 @@ MaxAccRate:                  2.00
 
 MaxVelRate:                  4.00
 
-WeightT:                     1024.0
+WeightT:                     128.0
 
 WeightAcc:                   0.0
 

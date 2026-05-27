@@ -613,6 +613,11 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         return false;
     }
 
+    if (!shouldReplaceCurrentTraj(traj, trajStartStamp, odomStamp))
+    {
+        return false;
+    }
+
     quadrotor_msgs::PolynomialTrajectory trajMsg;
     ros::Time mutableStamp = trajStartStamp;
 
