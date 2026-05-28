@@ -69,27 +69,21 @@ public:
 
     void tryReplan(const ros::Time &stamp);
 
-    bool planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
-                                 const Eigen::Vector3d &startVel,
-                                 const Eigen::Vector3d &startAcc,
-                                 const Eigen::Vector3d &goal,
-                                 const ros::Time &stamp);
-    
-    bool repairRouteFromCurrentOdom(std::vector<Eigen::Vector3d> &route,
-                                Eigen::Vector3d &trajStartPos,
-                                Eigen::Vector3d &trajStartVel,
-                                Eigen::Vector3d &trajStartAcc,
-                                ros::Time &trajStartStamp) const;
+    bool planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &stamp);
 
     bool checkCurrentTrajSafe(const ros::Time &stamp) const;
 
     Eigen::Vector3d selectLocalGoal(const Eigen::Vector3d &startPos) const;
 
-    bool getReplanStartState(const ros::Time &stamp,
-                             Eigen::Vector3d &startPos,
-                             Eigen::Vector3d &startVel,
-                             Eigen::Vector3d &startAcc,
-                             ros::Time &trajStartStamp) const;
+    bool buildReusedPrefix(const ros::Time &stamp,
+                        std::vector<Eigen::Vector3d> &reusedPrefix,
+                        Eigen::Vector3d &startPos,
+                        Eigen::Vector3d &startVel,
+                        Eigen::Vector3d &startAcc,
+                        ros::Time &trajStartStamp) const;
+
+    bool appendRrtRouteTail(const std::vector<Eigen::Vector3d> &rrtRoute,
+                            std::vector<Eigen::Vector3d> &route) const;
 
     bool publishEmergencyStopTraj(const ros::Time &stamp);
 

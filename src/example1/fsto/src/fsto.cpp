@@ -209,11 +209,29 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     //     return;
     // }
 
-    // ------------------------- 获取重规划的起点和终点 -------------------------- //
-    Eigen::Vector3d startPos, startVel, startAcc;
-    ros::Time trajStartStamp;
-    getReplanStartState(stamp, startPos, startVel, startAcc, trajStartStamp);
-    const Eigen::Vector3d localGoal = selectLocalGoal(startPos);
+    // ------------------------- 获取重规划的终点 -------------------------- //
+    // 获取局部目标选择用的参考起点(旧轨迹前向拼接点)。有有效轨迹时使用旧轨迹前向拼接点；否则使用当前 odom。
+    Eigen::Vector3d goalSelectStart = curOdomPose.translation();
+
+    if (hasActiveTraj && currentTraj.getPieceNum() > 0)
+    {
+        double t_now = (stamp - currentTrajStartTime).toSec();
+
+        if (t_now < 0.0)
+        {
+            t_now = 0.0;
+        }
+
+        const double totalT = currentTraj.getTotalDuration();
+        const double t_start = t_now + config.replan_time_ahead;
+
+        if (t_start < totalT)
+        {
+            goalSelectStart = currentTraj.getPos(t_start);  // 旧轨迹前向拼接点
+        }
+    }
+
+    const Eigen::Vector3d localGoal = selectLocalGoal(goalSelectStart);
 
     if (!localMapPtr->safeQuery(localGoal, config.bodySafeRadius))
     {
@@ -231,7 +249,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     }
 
     // ------------------------- 重规划 -------------------------- //
-    const bool success = planAndPublishLocalTraj(startPos, startVel, startAcc, localGoal, trajStartStamp);
+    const bool success = planAndPublishLocalTraj(localGoal, stamp);
 
     if (success)
     {
@@ -249,82 +267,6 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     // 失败且旧轨迹不安全：发布刹停轨迹
     ROS_ERROR("[tryReplan] Replan failed and current trajectory unsafe. Publish emergency stop.");
     publishEmergencyStopTraj(stamp);
-}
-
-/*
-如果当前没有旧轨迹：
-    从当前 odom 状态开始规划。
-
-如果当前已有旧轨迹：
-    不直接从当前 odom 状态开始；
-    而是从旧轨迹未来某个时间点开始规划，
-    使新轨迹和旧轨迹在拼接点处保持 p、v、a 连续。
-*/
-bool MavGlobalPlanner::getReplanStartState(const ros::Time &stamp,
-                                           Eigen::Vector3d &startPos,
-                                           Eigen::Vector3d &startVel,
-                                           Eigen::Vector3d &startAcc,
-                                           ros::Time &trajStartStamp) const
-{
-    if (!hasActiveTraj || currentTraj.getPieceNum() <= 0)
-    {
-        startPos = curOdomPose.translation();
-        startVel = curOdomVel;
-        startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
-        trajStartStamp = stamp;
-        return true;
-    }
-
-    double t_now = (stamp - currentTrajStartTime).toSec();
-    if (t_now < 0.0)
-    {
-        t_now = 0.0;
-    }
-
-    const double totalT = currentTraj.getTotalDuration();
-
-    if (totalT <= 1e-3)
-    {
-        startPos = curOdomPose.translation();
-        startVel = curOdomVel;
-        startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
-        trajStartStamp = stamp;
-        return true;
-    }
-
-    double t_replan = t_now + config.replan_time_ahead;
-
-    if (t_replan < totalT)
-    {
-        startPos = currentTraj.getPos(t_replan);
-        startVel = currentTraj.getVel(t_replan);
-        startAcc = currentTraj.getAcc(t_replan);
-        trajStartStamp = currentTrajStartTime + ros::Duration(t_replan);
-        return true;
-    }
-
-    // 旧轨迹剩余太短时，尝试使用旧轨迹末端前的一个点。
-    // 但必须保证该点仍然位于当前时刻之后。
-    const double tail_margin = std::min(0.10, 0.5 * totalT);
-    const double t_tail = totalT - tail_margin;
-
-    if (t_tail > t_now)
-    {
-        startPos = currentTraj.getPos(t_tail);
-        startVel = currentTraj.getVel(t_tail);
-        startAcc = currentTraj.getAcc(t_tail);
-        trajStartStamp = currentTrajStartTime + ros::Duration(t_tail);
-        return true;
-    }
-
-    // 如果旧轨迹末端附近的点也已经在过去，
-    // 则不能再从旧轨迹采样，只能从当前 odom 状态开始。
-    startPos = curOdomPose.translation();
-    startVel = curOdomVel;
-    startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
-    trajStartStamp = stamp;
-
-    return true;
 }
 
 /*
@@ -411,6 +353,207 @@ Eigen::Vector3d MavGlobalPlanner::selectLocalGoal(const Eigen::Vector3d &startPo
     }
 
     return bestGoal;
+}
+
+bool MavGlobalPlanner::buildReusedPrefix(
+    const ros::Time &stamp,
+    std::vector<Eigen::Vector3d> &reusedPrefix,
+    Eigen::Vector3d &startPos,
+    Eigen::Vector3d &startVel,
+    Eigen::Vector3d &startAcc,
+    ros::Time &trajStartStamp) const
+{
+    reusedPrefix.clear();
+
+    // ============================================================
+    // 当前没有有效轨迹：直接从 odom 状态启动。
+    // ============================================================
+    if (!hasActiveTraj || currentTraj.getPieceNum() <= 0)
+    {
+        startPos = curOdomPose.translation();
+        startVel = curOdomVel;
+        startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+        trajStartStamp = stamp;
+
+        if (!localMapPtr->safeQuery(startPos, config.bodySafeRadius))
+        {
+            ROS_WARN("[buildReusedPrefix] Odom start position is unsafe.");
+            return false;
+        }
+
+        reusedPrefix.push_back(startPos);
+        return true;
+    }
+
+    double t_now = (stamp - currentTrajStartTime).toSec();
+
+    if (t_now < 0.0)
+    {
+        t_now = 0.0;
+    }
+
+    const double totalT = currentTraj.getTotalDuration();
+
+    if (totalT <= 1e-3 || t_now >= totalT)
+    {
+        startPos = curOdomPose.translation();
+        startVel = curOdomVel;
+        startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+        trajStartStamp = stamp;
+
+        if (!localMapPtr->safeQuery(startPos, config.bodySafeRadius))
+        {
+            ROS_WARN("[buildReusedPrefix] Odom start position is unsafe.");
+            return false;
+        }
+
+        reusedPrefix.push_back(startPos);
+        return true;
+    }
+
+    // ============================================================
+    // 新轨迹起点仍然取旧轨迹前向拼接点的 p/v/a。
+    // ============================================================
+    double t_start = t_now + config.replan_time_ahead;
+
+    // 如果前向拼接点已经超过旧轨迹末端，则退回当前 odom。
+    // 不再强行复用旧轨迹末端，避免轨迹起点落在过去。
+    if (t_start >= totalT)
+    {
+        startPos = curOdomPose.translation();
+        startVel = curOdomVel;
+        startAcc = accInitialized ? curOdomAcc : Eigen::Vector3d::Zero();
+        trajStartStamp = stamp;
+
+        if (!localMapPtr->safeQuery(startPos, config.bodySafeRadius))
+        {
+            ROS_WARN("[buildReusedPrefix] Odom start position is unsafe.");
+            return false;
+        }
+
+        reusedPrefix.push_back(startPos);
+        return true;
+    }
+
+    startPos = currentTraj.getPos(t_start);
+    startVel = currentTraj.getVel(t_start);
+    startAcc = currentTraj.getAcc(t_start);
+    trajStartStamp = currentTrajStartTime + ros::Duration(t_start);
+
+    if (!localMapPtr->safeQuery(startPos, config.bodySafeRadius))
+    {
+        ROS_WARN("[buildReusedPrefix] Splice start position is unsafe.");
+        return false;
+    }
+
+    reusedPrefix.push_back(startPos);
+
+    // ============================================================
+    // route 前缀复用旧轨迹前向拼接点以及再向前采样一小段得到的安全前视点。
+    // ============================================================
+    const double reuse_time = std::max(0.0, config.reuse_traj_time);
+    const double reuse_dt = std::max(1e-3, config.reuse_traj_dt);
+    const double t_end = std::min(totalT, t_start + reuse_time);
+
+    Eigen::Vector3d lastPt = startPos;
+
+    for (double t = t_start + reuse_dt; t <= t_end + 1e-6; t += reuse_dt)
+    {
+        const Eigen::Vector3d p = currentTraj.getPos(t);
+
+        if (!localMapPtr->safeQuery(p, config.bodySafeRadius))
+        {
+            ROS_WARN("[buildReusedPrefix] Stop prefix reuse: unsafe sample at t=%.3f.", t);
+            break;
+        }
+
+        if (!trajGen.segmentSafe(lastPt,
+                                 p,
+                                 config.spatialResolution,
+                                 config.bodySafeRadius))
+        {
+            ROS_WARN("[buildReusedPrefix] Stop prefix reuse: unsafe segment.");
+            break;
+        }
+
+        if ((p - reusedPrefix.back()).norm() > 1e-3)
+        {
+            reusedPrefix.push_back(p);
+            lastPt = p;
+        }
+    }
+
+    ROS_WARN("[buildReusedPrefix] prefix_size=%lu, t_start=%.3f, t_end=%.3f, startVel=%.3f",
+             reusedPrefix.size(),
+             t_start,
+             t_end,
+             startVel.norm());
+
+    return true;
+}
+
+bool MavGlobalPlanner::appendRrtRouteTail(
+    const std::vector<Eigen::Vector3d> &rrtRoute,
+    std::vector<Eigen::Vector3d> &route) const
+{
+    if (route.empty())
+    {
+        ROS_WARN("[appendRrtRouteTail] Reused prefix is empty.");
+        return false;
+    }
+
+    if (rrtRoute.size() <= 1)
+    {
+        ROS_WARN("[appendRrtRouteTail] RRT route is invalid.");
+        return false;
+    }
+
+    std::vector<Eigen::Vector3d> rrtTail;
+    rrtTail.reserve(rrtRoute.size());
+
+    // rrtRoute[0] 应该等于 reusedPrefix.back()，所以从 1 开始取尾部。
+    rrtTail.push_back(route.back());
+
+    for (size_t i = 1; i < rrtRoute.size(); ++i)
+    {
+        if ((rrtRoute[i] - rrtTail.back()).norm() > 1e-6)
+        {
+            rrtTail.push_back(rrtRoute[i]);
+        }
+    }
+
+    if (rrtTail.size() <= 1)
+    {
+        ROS_WARN("[appendRrtRouteTail] RRT tail has no useful points.");
+        return false;
+    }
+
+    // 只对 RRT tail 做 LOS 简化，不简化 reusedPrefix。
+    // 这样可以保留旧轨迹复用前缀，避免被 routeSimplify 直接跳过。
+    rrtTail = trajGen.routeSimplify(rrtTail, config.spatialResolution);
+
+    if (rrtTail.size() <= 1)
+    {
+        ROS_WARN("[appendRrtRouteTail] RRT tail invalid after simplify.");
+        return false;
+    }
+
+    // 将 rrtTail[1:] 接到 reusedPrefix 后面。
+    for (size_t i = 1; i < rrtTail.size(); ++i)
+    {
+        if ((rrtTail[i] - route.back()).norm() > 1e-6)
+        {
+            route.push_back(rrtTail[i]);
+        }
+    }
+
+    if (route.size() <= 1)
+    {
+        ROS_WARN("[appendRrtRouteTail] Final route is invalid.");
+        return false;
+    }
+
+    return true;
 }
 
 bool MavGlobalPlanner::publishEmergencyStopTraj(const ros::Time &stamp)
@@ -611,42 +754,88 @@ void MavGlobalPlanner::initPresetWaypoints()
     ROS_WARN("[initPresetWaypoints] Loaded %lu preset waypoints.", presetWaypoints.size());
 }
 
-bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
-                                               const Eigen::Vector3d &startVel,
-                                               const Eigen::Vector3d &startAcc,
-                                               const Eigen::Vector3d &goal,
-                                               const ros::Time &trajStartStamp)
+bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &trajStartStampInput)
 {
-    // ----------------------- 路径规划 r3planner ----------------------- //
+    // ============================================================
+    // 1. 构造复用前缀：
+    //    - 无有效轨迹：使用 odom 位置作为起点；
+    //    - 有有效轨迹：使用旧轨迹前向拼接点 p/v/a 作为新轨迹起点，
+    //      并向前采样一小段安全前缀 reusedPrefix。
+    // ============================================================
     std::vector<Eigen::Vector3d> route;
+    Eigen::Vector3d trajStartPos;
+    Eigen::Vector3d trajStartVel;
+    Eigen::Vector3d trajStartAcc;
+    ros::Time actualTrajStartStamp;
 
-    // std::cout << "[planAndPublishLocalTraj] start of r3planner:" << startPos << "goal of r3planner:" << goal << std::endl;
-    double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
-    
-    if (!std::isfinite(rrt_cost) || route.size() <= 1)
+    if (!buildReusedPrefix(odomStamp,
+                           route,
+                           trajStartPos,
+                           trajStartVel,
+                           trajStartAcc,
+                           actualTrajStartStamp))
     {
-        ROS_WARN("[planAndPublishLocalTraj] Directional R3Planner failed. Retry without direction constraint.");
-
-        route.clear();
-        rrt_cost = r3planner.planOnce(startPos, goal, route);
+        ROS_WARN("[planAndPublishLocalTraj] Failed to build reused prefix.");
+        return false;
     }
-    if (!std::isfinite(rrt_cost) || route.size() <= 1)
+
+    if (route.empty())
     {
-        ROS_WARN("[planAndPublishLocalTraj] R3Planner failed.");
+        ROS_WARN("[planAndPublishLocalTraj] Empty reused prefix.");
+        return false;
+    }
+
+    const Eigen::Vector3d rrtStart = route.back();
+
+    if (!localMapPtr->safeQuery(rrtStart, config.bodySafeRadius))
+    {
+        ROS_WARN("[planAndPublishLocalTraj] RRT start is unsafe.");
+        return false;
+    }
+
+    if (!localMapPtr->safeQuery(goal, config.bodySafeRadius))
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Goal is unsafe before R3 planning.");
         return false;
     }
     // visualization.visualizeRoute(route, ros::Time::now(), 1);
 
-    // LOS简化路径
-    route = trajGen.routeSimplify(route, config.spatialResolution);
-    if (route.size() <= 1)
+    // ============================================================
+    // 2. R3Planner 从 reusedPrefix.back() 搜索到 localGoal
+    // ============================================================
+    std::vector<Eigen::Vector3d> rrtRoute;
+
+    const double rrt_cost = r3planner.planOnce(rrtStart, goal, rrtRoute);
+
+    if (!std::isfinite(rrt_cost) || rrtRoute.size() <= 1)
     {
-        ROS_WARN("[planAndPublishLocalTraj] Route invalid after LOS simplify.");
+        ROS_WARN("[planAndPublishLocalTraj] R3Planner failed.");
         return false;
     }
+
+    // ============================================================
+    // 3. 将 rrtRoute[1:] 进行 routeSimplify，然后拼接到 reusedPrefix 后。
+    // ============================================================
+    if (!appendRrtRouteTail(rrtRoute, route))
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Failed to append simplified RRT tail.");
+        return false;
+    }
+
+    if (route.size() <= 1)
+    {
+        ROS_WARN("[planAndPublishLocalTraj] Final route is invalid.");
+        return false;
+    }
+
+    // 可视化最终 route：reusedPrefix + simplified rrt tail
     visualization.visualizeRoute(route, ros::Time::now(), 2);
 
-    //----------------------- 设置局部目标点的速度 ----------------------- //
+    // ============================================================
+    // 4. 生成末端速度。
+    //    只有当局部目标点不是全局目标点时，速度才为 local_goal_speed；
+    //    如果已经是全局目标点，则末端速度为 0。
+    // ============================================================
     Eigen::Vector3d finVel = Eigen::Vector3d::Zero();
     Eigen::Vector3d finAcc = Eigen::Vector3d::Zero();
     const double global_goal_thresh = std::max(config.spatialResolution, config.waypoint_reach_thresh);
@@ -654,14 +843,14 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
 
     if (!localGoalIsGlobalGoal)
     {
-        // 根据 route 末端切线方向设置局部轨迹终端速度
+        // 根据最终 route 的末端切线方向设置局部轨迹终端速度。
         Eigen::Vector3d tangent = Eigen::Vector3d::Zero();
         const Eigen::Vector3d routeEnd = route.back();
-
-        // 1. 从 route 末端往前找一个与终点不重合的点，用于计算末端切线方向。
+        
+        // 从 route 末端往前找一个与终点不重合的点，用于计算末端切线方向。
         for (int i = static_cast<int>(route.size()) - 2; i >= 0; --i)
         {
-            Eigen::Vector3d diff = routeEnd - route[i];
+            const Eigen::Vector3d diff = routeEnd - route[i];
 
             if (diff.norm() > 0.1)
             {
@@ -670,63 +859,81 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
             }
         }
 
-        // 2. 如果退化，使用 goal - startPos
+        // 如果退化，使用 goal - startPos
         if (tangent.norm() < 1e-3)
         {
-            Eigen::Vector3d diff = goal - startPos;
+            const Eigen::Vector3d diff = goal - trajStartPos;
+
             if (diff.norm() > 1e-3)
             {
                 tangent = diff.normalized();
             }
         }
-
-        // 3. 如果仍退化，使用 startVel
-        if (tangent.norm() < 1e-3 && startVel.norm() > 1e-3)
+        // 如果仍退化，使用 startVel
+        if (tangent.norm() < 1e-3 && trajStartVel.norm() > 1e-3)
         {
-            tangent = startVel.normalized();
+            tangent = trajStartVel.normalized();
         }
-
-        // 4. 最后统一赋值
+        // 最后统一赋值
         if (tangent.norm() > 1e-3)
         {
             finVel = config.local_goal_speed * tangent.normalized();
         }
-        else
-        {
-            finVel = Eigen::Vector3d::Zero();
-        }
     }
-    ROS_WARN("[planAndPublishLocalTraj] Terminal velocity set by route tangent: "
-             "vx=%.3f, vy=%.3f, vz=%.3f, speed=%.3f", finVel(0), finVel(1), finVel(2), finVel.norm());
-    
-    // ----------------------- 轨迹规划 AM ----------------------- //
-    Trajectory traj = trajGen.generate(route,
-                                       startVel, startAcc,
-                                       finVel, finAcc,
-                                       config.alg, visualization);
 
-    // ----------------------- 轨迹发布 ----------------------- //
+    ROS_WARN("[planAndPublishLocalTraj] prefix_size=%lu, final_route_size=%lu, "
+             "finVel=[%.3f %.3f %.3f], speed=%.3f",
+             route.size(),
+             route.size(),
+             finVel(0), finVel(1), finVel(2), finVel.norm());
+
+    // ============================================================
+    // 5. 轨迹规划：
+    //    起点边界条件使用旧轨迹前向拼接点的 p/v/a；
+    //    route 前缀复用旧轨迹安全前视段；
+    //    RRT tail 提供后续绕障路径。
+    // ============================================================
+    Trajectory traj = trajGen.generate(route,
+                                       trajStartVel,
+                                       trajStartAcc,
+                                       finVel,
+                                       finAcc,
+                                       config.alg,
+                                       visualization);
+
+    // ============================================================
+    // 6. 轨迹发布
+    // ============================================================
     if (traj.getPieceNum() <= 0)
     {
         ROS_WARN("[planAndPublishLocalTraj] TrajGen failed.");
         return false;
     }
 
-    if (!shouldReplaceCurrentTraj(traj, trajStartStamp, odomStamp)) return false;
-        
-    quadrotor_msgs::PolynomialTrajectory trajMsg;
-    ros::Time mutableStamp = trajStartStamp;
+    if (!shouldReplaceCurrentTraj(traj, actualTrajStartStamp, odomStamp))
+    {
+        return false;
+    }
 
-    polynomialTrajConverter(traj, trajMsg, Eigen::Isometry3d::Identity(), mutableStamp);
+    quadrotor_msgs::PolynomialTrajectory trajMsg;
+    ros::Time mutableStamp = actualTrajStartStamp;
+
+    polynomialTrajConverter(traj,
+                            trajMsg,
+                            Eigen::Isometry3d::Identity(),
+                            mutableStamp);
 
     trajPub.publish(trajMsg);
     visualization.visualize(traj, route, ros::Time::now(), 1);
 
     currentTraj = traj;
-    currentTrajStartTime = trajStartStamp;
+    currentTrajStartTime = actualTrajStartStamp;
     hasActiveTraj = true;
 
-    ROS_WARN("[planAndPublishLocalTraj] New local trajectory published. Duration = %.3f", traj.getTotalDuration());
+    ROS_WARN("[planAndPublishLocalTraj] New local trajectory published. "
+             "Duration = %.3f, start_stamp_delay = %.3f",
+             traj.getTotalDuration(),
+             (actualTrajStartStamp - odomStamp).toSec());
 
     return true;
 }
@@ -986,8 +1193,8 @@ void Visualization::visualizeRoute(const std::vector<Eigen::Vector3d> &route,
     
     // 根据 id 设置颜色
     if (id == 1)          { lineMarker.scale.x *= 1; lineMarker.color.r = 0.0f; lineMarker.color.g = 0.0f; lineMarker.color.b = 1.0f; } // 蓝色  r3planner的结果
-    else if (id == 2)     { lineMarker.scale.x *= 2; lineMarker.color.r = 0.8f; lineMarker.color.g = 0.0f; lineMarker.color.b = 1.0f; } // 紫色  r3planner routeSimplify后的结果
-    else if (id == 3)     { lineMarker.scale.x *= 1; lineMarker.color.r = 0.0f; lineMarker.color.g = 1.0f; lineMarker.color.b = 0.0f; } // 绿色  repair 后的结果
+    else if (id == 2)     { lineMarker.scale.x *= 1; lineMarker.color.r = 0.8f; lineMarker.color.g = 0.0f; lineMarker.color.b = 1.0f; } // 紫色  r3planner routeSimplify后的结果
+    else if (id == 3)     { lineMarker.scale.x *= 1; lineMarker.color.r = 0.0f; lineMarker.color.g = 1.0f; lineMarker.color.b = 0.0f; } // 绿色  安全检查trajSafeCheck插入中间点 后的结果
     else                  { lineMarker.scale.x *= 1; lineMarker.color.r = 1.0f; lineMarker.color.g = 1.0f; lineMarker.color.b = 0.0f; } // 黄色
     
     for (const auto &p : route)

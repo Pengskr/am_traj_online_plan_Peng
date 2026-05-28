@@ -35,18 +35,13 @@ R3_cost_check_interval:           0.01    # s，每隔多久检查一次当前�
 R3_cost_stagnation_time:          0.03    # s，cost 持续这么久没有显著下降则提前停止
 R3_cost_improvement_threshold:    0.50    # m，cost 降低小于该值认为没有显著改善
 
-# R3Planner direction constraint
-R3_direction_min_vel:             0.20   # m/s，低于该速度时不启用方向约束：当前速度低于该值时，认为无人机近似静止，不约束 RRT 初始方向。
-R3_direction_constraint_radius:   1.20   # m，只约束起点附近的边：只在 startPos 附近该半径内约束边方向，避免限制后续绕障能力。
-R3_max_initial_turn_angle:        60.0   # deg，允许的最大初始转向角:RRT 起始边与当前速度方向允许的最大夹角。
-
 TryOut:                      5
 
 MaxAccRate:                  2.00
 
 MaxVelRate:                  4.00
 
-WeightT:                     1024.0
+WeightT:                     128.0
 
 WeightAcc:                   0.0
 
@@ -66,13 +61,17 @@ Local_map_update_dt:         0.10   # 10Hz
 Replan_dt:                  1.00   # 周期性重规划间隔
 Collision_check_horizon:    2.00   # 检查当前轨迹未来 1.5s 是否发生碰撞
 Collision_check_dt:         0.10
-Local_goal_ratio:           0.90   # local goal = Local_goal_ratio * sensing radius；该参数大于1时 Collision_check_horizon 未来轨迹碰撞检测才会发挥作用；该参数小于1考虑路径复用
-Replan_time_ahead:          0.40   # 旧轨迹前向拼接点
+
+Local_goal_ratio:           0.90   # local goal = Local_goal_ratio * sensing radius；该参数小于1考虑路径复用
+Replan_time_ahead:          0.35   # 旧轨迹前向拼接点
 Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
+Reuse_traj_time:            1.00   # s，从旧轨迹前向拼接点开始，最多复用旧轨迹未来多长时间
+Reuse_traj_dt:              0.50   # s，构造 reusedPrefix 的采样间隔
+
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
-Local_goal_speed:           0.5
+Local_goal_speed:           0.2
 
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理

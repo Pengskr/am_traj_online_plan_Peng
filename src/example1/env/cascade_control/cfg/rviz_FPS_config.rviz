@@ -140,7 +140,7 @@ Visualization Manager:
           Color: 73; 185; 255
           Color Transformer: FlatColor
           Decay Time: 0
-          Enabled: false
+          Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
@@ -155,11 +155,11 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: false
+          Value: true
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.25
+            Max Value: 5.349999904632568
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -168,7 +168,7 @@ Visualization Manager:
           Color: 255; 255; 255
           Color Transformer: AxisColor
           Decay Time: 0
-          Enabled: true
+          Enabled: false
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Min Color: 0; 0; 0
@@ -183,7 +183,7 @@ Visualization Manager:
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
-          Value: true
+          Value: false
       Enabled: true
       Name: Map
     - Class: rviz/Marker
@@ -238,25 +238,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 0.6547197103500366
+      Distance: 0.48411262035369873
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.8740930557250977
-        Y: 0.037374019622802734
-        Z: -5.960464477539062e-7
+        X: -0.2625163197517395
+        Y: -0.01686534471809864
+        Z: -6.109476089477539e-7
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.29479748010635376
+      Pitch: 0.5347973108291626
       Target Frame: drone1
       Value: ThirdPersonFollower (rviz)
-      Yaw: 3.0765340328216553
+      Yaw: 3.121535062789917
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 4.048277378082275
@@ -395,4 +395,4 @@ Window Geometry:
     collapsed: false
   Width: 487
   X: 197
-  Y: 834
+  Y: 774

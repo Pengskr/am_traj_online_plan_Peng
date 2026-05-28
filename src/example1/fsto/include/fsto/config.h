@@ -34,9 +34,6 @@ struct Config
     double r3_cost_check_interval;
     double r3_cost_stagnation_time;
     double r3_cost_improvement_threshold;
-    double r3_direction_min_vel;
-    double r3_direction_constraint_radius;
-    double r3_max_initial_turn_angle;
     int tryOut;
     double maxAccRate;
     double maxVelRate;
@@ -54,6 +51,8 @@ struct Config
     double local_goal_ratio;
     double replan_time_ahead;
     double min_traj_remaining_time;
+    double reuse_traj_time;
+    double reuse_traj_dt;
     double min_replan_interval;
     double emergency_stop_duration;
     double local_goal_sample_angle;
@@ -84,9 +83,6 @@ struct Config
         nh_priv.getParam("R3_cost_check_interval", conf.r3_cost_check_interval);
         nh_priv.getParam("R3_cost_stagnation_time", conf.r3_cost_stagnation_time);
         nh_priv.getParam("R3_cost_improvement_threshold", conf.r3_cost_improvement_threshold);
-        nh_priv.getParam("R3_direction_min_vel", conf.r3_direction_min_vel);
-        nh_priv.getParam("R3_direction_constraint_radius", conf.r3_direction_constraint_radius);
-        nh_priv.getParam("R3_max_initial_turn_angle", conf.r3_max_initial_turn_angle);
         nh_priv.getParam("TryOut", conf.tryOut);
         nh_priv.getParam("MaxAccRate", conf.maxAccRate);
         nh_priv.getParam("MaxVelRate", conf.maxVelRate);
@@ -104,6 +100,8 @@ struct Config
         nh_priv.getParam("Local_goal_ratio", conf.local_goal_ratio);
         nh_priv.getParam("Replan_time_ahead", conf.replan_time_ahead);
         nh_priv.getParam("Min_traj_remaining_time", conf.min_traj_remaining_time);
+        nh_priv.getParam("Reuse_traj_time", conf.reuse_traj_time);
+        nh_priv.getParam("Reuse_traj_dt", conf.reuse_traj_dt);
         nh_priv.getParam("Min_replan_interval", conf.min_replan_interval);
         nh_priv.getParam("Emergency_stop_duration", conf.emergency_stop_duration);
         nh_priv.getParam("Local_goal_sample_angle", conf.local_goal_sample_angle);

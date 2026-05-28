@@ -161,7 +161,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.349999904632568
+            Max Value: 4.849999904632568
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -209,8 +209,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/route
       Name: Route
       Namespaces:
-        route_line: true
-        route_points: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
