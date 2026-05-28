@@ -9,5 +9,8 @@
     </node>
 
     <node pkg="example1" type="key2joy.py" name="key2joy" output="screen" />
+
+    <node pkg="plotjuggler" type="plotjuggler" name="plotjuggler" output="screen" 
+          args="--layout $(find example1)/config/plotjuggler.xml" />
     
 </launch>
