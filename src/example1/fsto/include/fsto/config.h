@@ -31,6 +31,9 @@ struct Config
     double edfResolution;
     std::vector<double> r3Bound;
     double searchDuration;
+    double r3_cost_check_interval;
+    double r3_cost_stagnation_time;
+    double r3_cost_improvement_threshold;
     double r3_direction_min_vel;
     double r3_direction_constraint_radius;
     double r3_max_initial_turn_angle;
@@ -78,6 +81,9 @@ struct Config
         nh_priv.getParam("EdfResolution", conf.edfResolution);
         nh_priv.getParam("R3Bound", conf.r3Bound);
         nh_priv.getParam("SearchDuration", conf.searchDuration);
+        nh_priv.getParam("R3_cost_check_interval", conf.r3_cost_check_interval);
+        nh_priv.getParam("R3_cost_stagnation_time", conf.r3_cost_stagnation_time);
+        nh_priv.getParam("R3_cost_improvement_threshold", conf.r3_cost_improvement_threshold);
         nh_priv.getParam("R3_direction_min_vel", conf.r3_direction_min_vel);
         nh_priv.getParam("R3_direction_constraint_radius", conf.r3_direction_constraint_radius);
         nh_priv.getParam("R3_max_initial_turn_angle", conf.r3_max_initial_turn_angle);

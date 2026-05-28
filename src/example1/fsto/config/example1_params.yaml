@@ -30,11 +30,14 @@ R3Bound:                     [-10.0, 10.0, -10.0, 10.0, 0.0, 5.0]
 
 SearchDuration:              0.10
 
+# R3Planner early stop by cost stagnation
+R3_cost_check_interval:           0.01    # s，每隔多久检查一次当前最优 cost
+R3_cost_stagnation_time:          0.03    # s，cost 持续这么久没有显著下降则提前停止
+R3_cost_improvement_threshold:    0.50    # m，cost 降低小于该值认为没有显著改善
+
 # R3Planner direction constraint
 R3_direction_min_vel:             0.20   # m/s，低于该速度时不启用方向约束：当前速度低于该值时，认为无人机近似静止，不约束 RRT 初始方向。
-
 R3_direction_constraint_radius:   1.20   # m，只约束起点附近的边：只在 startPos 附近该半径内约束边方向，避免限制后续绕障能力。
-
 R3_max_initial_turn_angle:        60.0   # deg，允许的最大初始转向角:RRT 起始边与当前速度方向允许的最大夹角。
 
 TryOut:                      5

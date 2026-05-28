@@ -253,12 +253,70 @@ double R3Planner::plan(const Vector3d &s,
     planner->setProblemDefinition(pdef);
     planner->setup();
 
-    ob::PlannerStatus solved;
-    solved = planner->ob::Planner::solve(timeout);
+    // ============================================================
+    // Cost stagnation early stop
+    // 原来 planner->solve(timeout) 会一直运行到 SearchDuration。
+    // 这里改成分段 solve，每隔 r3_cost_check_interval 检查一次当前最优 cost。
+    // 如果找到解后，cost 在 r3_cost_stagnation_time 内没有明显降低，则提前停止。
+    // ============================================================
+    const double check_interval =
+        std::max(1e-3, config.r3_cost_check_interval);
+
+    const double stagnation_time =
+        std::max(check_interval, config.r3_cost_stagnation_time);
+
+    const double improve_threshold =
+        std::max(0.0, config.r3_cost_improvement_threshold);
+
+    double elapsed = 0.0;
+    double lastImprovedTime = 0.0;
+    double bestCost = std::numeric_limits<double>::infinity();
+
+    bool hasSolution = false;
+    ob::PlannerStatus solved(false, false);
+
+    while (elapsed < timeout)
+    {
+        const double dt = std::min(check_interval, timeout - elapsed);
+
+        ob::PlannerStatus status = planner->ob::Planner::solve(dt);
+
+        elapsed += dt;
+
+        if (!status)
+        {
+            continue;
+        }
+
+        // 一旦 status 为 true，说明已经有可行解。
+        solved = status;
+        hasSolution = true;
+
+        const double currentCost =
+            pdef->getSolutionPath()->cost(pdef->getOptimizationObjective()).value();
+
+        if (!std::isfinite(bestCost) ||
+            bestCost - currentCost > improve_threshold)
+        {
+            bestCost = currentCost;
+            lastImprovedTime = elapsed;
+        }
+
+        // 如果已经有解，并且 cost 在 stagnation_time 内没有显著改善，则提前停止。
+        if (elapsed - lastImprovedTime >= stagnation_time)
+        {
+            ROS_WARN("[R3Planner] Early stop by cost stagnation. "
+                    "elapsed=%.3f / %.3f, best_cost=%.3f",
+                    elapsed,
+                    timeout,
+                    bestCost);
+            break;
+        }
+    }
 
     double cost = INFINITY;
 
-    if (solved)
+    if (hasSolution)
     {
         const og::PathGeometric path_ =
             og::PathGeometric(dynamic_cast<const og::PathGeometric &>(*pdef->getSolutionPath()));
@@ -270,6 +328,12 @@ double R3Planner::plan(const Vector3d &s,
         }
 
         cost = pdef->getSolutionPath()->cost(pdef->getOptimizationObjective()).value();
+
+        ROS_WARN("[R3Planner] Solved. elapsed=%.3f / %.3f, cost=%.3f, state_count=%lu",
+                elapsed,
+                timeout,
+                cost,
+                path_.getStateCount());
     }
 
     return cost;

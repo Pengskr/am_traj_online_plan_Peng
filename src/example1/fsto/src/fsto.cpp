@@ -209,7 +209,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     //     return;
     // }
 
-    // 获取重规划的起点和终点
+    // ------------------------- 获取重规划的起点和终点 -------------------------- //
     Eigen::Vector3d startPos, startVel, startAcc;
     ros::Time trajStartStamp;
     getReplanStartState(stamp, startPos, startVel, startAcc, trajStartStamp);
@@ -230,6 +230,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
         return;
     }
 
+    // ------------------------- 重规划 -------------------------- //
     const bool success = planAndPublishLocalTraj(startPos, startVel, startAcc, localGoal, trajStartStamp);
 
     if (success)
@@ -619,7 +620,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     // ----------------------- 路径规划 r3planner ----------------------- //
     std::vector<Eigen::Vector3d> route;
 
-    std::cout << "[planAndPublishLocalTraj] start of r3planner:" << startPos << "goal of r3planner:" << goal << std::endl;
+    // std::cout << "[planAndPublishLocalTraj] start of r3planner:" << startPos << "goal of r3planner:" << goal << std::endl;
     double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
     
     if (!std::isfinite(rrt_cost) || route.size() <= 1)
@@ -634,7 +635,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         ROS_WARN("[planAndPublishLocalTraj] R3Planner failed.");
         return false;
     }
-    // visualization.visualizeRoute(route, ros::Time::now(), 1);
+    visualization.visualizeRoute(route, ros::Time::now(), 1);
 
     // LOS简化路径
     route = trajGen.routeSimplify(route, config.spatialResolution);
@@ -644,7 +645,6 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         return false;
     }
     visualization.visualizeRoute(route, ros::Time::now(), 2);
-
 
     // ----------------------- RRT 搜索耗时后，重新用当前 odom 修正 route 头部和轨迹初始状态 ----------------------- //
     Eigen::Vector3d trajStartPos = startPos;
@@ -992,7 +992,7 @@ void MavGlobalPlanner::polynomialTrajConverter(const Trajectory &traj,
 Visualization::Visualization(Config &conf, NodeHandle &nh_)
     : config(conf), nh(nh_)
 {
-    routePub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/route", 1);
+    routePub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/route", 10);
     wayPointsPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/waypoints", 1);
     appliedTrajectoryPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/applied_trajectory", 1);
 }
@@ -1114,6 +1114,15 @@ void Visualization::visualizeRoute(const std::vector<Eigen::Vector3d> &route,
 {
     if (route.empty())
         return;
+
+    // 删除routePub中所有可能残留的 line 和 point marker，包括 visualize() 里的！
+    if (id == 1){
+        visualization_msgs::Marker delMarker;
+        delMarker.header.stamp = timeStamp;
+        delMarker.header.frame_id = config.odomFrame;
+        delMarker.action = visualization_msgs::Marker::DELETEALL;
+        routePub.publish(delMarker);
+    }
 
     // ============================================================
     // 航点之间用直线连接
