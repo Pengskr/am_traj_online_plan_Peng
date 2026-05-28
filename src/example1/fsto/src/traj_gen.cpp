@@ -25,10 +25,7 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 {
     Trajectory traj;
 
-    if (route.size() < 2 || (route[0] - route[1]).squaredNorm() < FLT_EPSILON)
-    {
-        return traj;
-    }
+    if (route.size() < 2 || (route[0] - route[1]).squaredNorm() < FLT_EPSILON) return traj;
 
     // std::string result_dir = "/home/peng/Desktop/am_traj_Peng/src/example1/results/";
 
@@ -36,11 +33,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
     do
     {
         clock_t start = clock();
-
-        // 每轮重新优化前，都对当前 route 做一次 LOS shortcut。
-        // 这样 trajSafeCheck 插入的冗余折点如果可以被直连，会被删除。
-        route = routeSimplify(route, config.spatialResolution);
-        // visualization.visualizeRoute(route, ros::Time::now(), 3);
 
         tries++;
         if (tries > config.tryOut)  // 超过最大规划次数
@@ -51,6 +43,10 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
             break;
         }
 
+        // 每轮重新优化前，都对当前 route 做一次 LOS shortcut。 这样 trajSafeCheck 插入的冗余折点如果可以被直连，会被删除。
+        route = routeSimplify(route, config.spatialResolution);
+        visualization.visualizeRoute(route, ros::Time::now(), 3);
+        
         if(id_alg == 2){
             traj = trajOpt.genOptimalTrajDTCWholeScales3(route, initialVel, initialAcc, finalVel, finalAcc);    // 带时域缩放的有约束交替优化
             clock_t stop = clock();
@@ -145,72 +141,7 @@ bool TrajGen::trajSafeCheck(const Trajectory &traj, std::vector<Eigen::Vector3d>
                 return false;
             }
 
-            const Eigen::Vector3d mid = 0.5 * (p0 + p1);
-
-            Eigen::Vector3d insertPt = mid;
-
-            // ============================================================
-            // 优先尝试水平面左右法向偏移点。
-            // 这样比简单插中点更可能把 route 推离障碍物边缘。
-            // ============================================================
-            Eigen::Vector3d dir = seg;
-            dir(2) = 0.0;
-
-            if (dir.norm() > 0.1)
-            {
-                dir.normalize();
-
-                const Eigen::Vector3d left(-dir(1), dir(0), 0.0);
-                const Eigen::Vector3d right(dir(1), -dir(0), 0.0);
-
-                // 偏移距离：至少取 r3SafeRadius，也给一个 0.5m 的下限。
-                const double offset = std::max(config.r3SafeRadius, 0.50);
-
-                Eigen::Vector3d candLeft = mid + offset * left;
-                Eigen::Vector3d candRight = mid + offset * right;
-
-                // 保持高度不变，先只在水平面绕障。
-                candLeft(2) = mid(2);
-                candRight(2) = mid(2);
-
-                bool leftSafe = MapPtr->safeQuery(candLeft, config.r3SafeRadius) &&
-                segmentSafe(p0, candLeft, config.spatialResolution, config.r3SafeRadius) &&
-                segmentSafe(candLeft, p1, config.spatialResolution, config.r3SafeRadius);
-                bool rightSafe = MapPtr->safeQuery(candRight, config.r3SafeRadius) &&
-                segmentSafe(p0, candRight, config.spatialResolution, config.r3SafeRadius) &&
-                segmentSafe(candRight, p1, config.spatialResolution, config.r3SafeRadius);
-
-                if (leftSafe && rightSafe)
-                {
-                    // 两侧都安全时，选择更接近终点的一侧。
-                    if ((candLeft - route.back()).norm() <
-                        (candRight - route.back()).norm())
-                    {
-                        insertPt = candLeft;
-                    }
-                    else
-                    {
-                        insertPt = candRight;
-                    }
-                }
-                else if (leftSafe)
-                {
-                    insertPt = candLeft;
-                }
-                else if (rightSafe)
-                {
-                    insertPt = candRight;
-                }
-                else
-                {
-                    // 左右偏移都不安全，退化为中点。
-                    insertPt = mid;
-                }
-            }
-            else
-            {
-                insertPt = mid;
-            }
+            Eigen::Vector3d insertPt = 0.5 * (p0 + p1);;
 
             // 防止插入点和原端点过近。
             if ((insertPt - p0).norm() < min_point_separation || (insertPt - p1).norm() < min_point_separation)
