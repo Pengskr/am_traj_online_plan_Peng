@@ -49,7 +49,7 @@ WeightAcc:                   0.0
 
 WeightJerk:                  1.0
 
-Iterations:                  23
+Iterations:                  20
 
 TemporalResolution:          0.02
 
@@ -63,9 +63,9 @@ Local_map_update_dt:         0.10   # 10Hz
 Replan_dt:                  1.00   # 周期性重规划间隔
 Collision_check_horizon:    2.00   # 检查当前轨迹未来 1.5s 是否发生碰撞
 Collision_check_dt:         0.10
-Local_goal_ratio:           1.40   # local goal = Local_goal_ratio * sensing radius；该参数大于1时 Collision_check_horizon
+Local_goal_ratio:           0.90   # local goal = Local_goal_ratio * sensing radius；该参数大于1时 Collision_check_horizon
 Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
-Min_traj_remaining_time:    2.00   # 当前轨迹剩余时间不足时强制重规划
+Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔

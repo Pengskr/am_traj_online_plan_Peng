@@ -217,7 +217,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
 
     if (!localMapPtr->safeQuery(localGoal, config.bodySafeRadius))
     {
-        ROS_WARN("[tryReplan] localGoal is unsafe.");
+        ROS_WARN("[tryReplan] localGoal (%.2f,%.2f,%.2f) is unsafe.", localGoal(0),localGoal(1),localGoal(2));
 
         if (hasActiveTraj && checkCurrentTrajSafe(stamp))
         {
@@ -618,7 +618,9 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
 {
     std::vector<Eigen::Vector3d> route;
 
+    std::cout << "[planAndPublishLocalTraj] start of r3planner:" << startPos << "goal of r3planner:" << goal << std::endl;
     double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
+    visualization
 
     if (!std::isfinite(rrt_cost) || route.size() <= 1)
     {
@@ -982,153 +984,4 @@ void MavGlobalPlanner::polynomialTrajConverter(const Trajectory &traj,
 
     trajMsg.mag_coeff = 1.0;
     trajMsg.debug_info = "";
-}
-
-Visualization::Visualization(Config &conf, NodeHandle &nh_)
-    : config(conf), nh(nh_)
-{
-    routePub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/route", 1);
-    wayPointsPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/waypoints", 1);
-    appliedTrajectoryPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/applied_trajectory", 1);
-}
-
-void Visualization::visualize(const Trajectory &appliedTraj, const vector<Vector3d> &route, Time timeStamp, int id)
-{
-    visualization_msgs::Marker routeMarker, wayPointsMarker, appliedTrajMarker;
-
-    routeMarker.id = id;
-    routeMarker.type = visualization_msgs::Marker::LINE_LIST;
-    routeMarker.header.stamp = timeStamp;
-    routeMarker.header.frame_id = config.odomFrame;
-    routeMarker.pose.orientation.w = 1.00;
-    routeMarker.action = visualization_msgs::Marker::ADD;
-    routeMarker.ns = "route";
-    routeMarker.color.r = 1.00;
-    routeMarker.color.g = 0.00;
-    routeMarker.color.b = 0.00;
-    routeMarker.color.a = 1.00;
-    routeMarker.scale.x = 0.10;
-
-    wayPointsMarker = routeMarker;
-    wayPointsMarker.type = visualization_msgs::Marker::SPHERE_LIST;
-    wayPointsMarker.ns = "waypoints";
-    wayPointsMarker.color.r = 0.00;
-    wayPointsMarker.color.g = 0.00;
-    wayPointsMarker.color.b = 1.00;
-    wayPointsMarker.scale.x = 0.20;
-    wayPointsMarker.scale.y = 0.20;
-    wayPointsMarker.scale.z = 0.20;
-
-    appliedTrajMarker = routeMarker;
-    appliedTrajMarker.header.frame_id = config.odomFrame;
-    appliedTrajMarker.id = id;
-    appliedTrajMarker.ns = "trajectory";
-    appliedTrajMarker.scale.x = 0.15;
-    if (id == 0)
-    {
-        appliedTrajMarker.color.r = 0.85;
-        appliedTrajMarker.color.g = 0.10;
-        appliedTrajMarker.color.b = 0.10;
-    }
-    else if (id == 1)
-    {
-        appliedTrajMarker.color.r = 1.00;
-        appliedTrajMarker.color.g = 0.65;
-        appliedTrajMarker.color.b = 0.00;
-    }        
-    else if (id == 2)
-    {
-        appliedTrajMarker.color.r = 0.00;
-        appliedTrajMarker.color.g = 0.45;
-        appliedTrajMarker.color.b = 0.74;
-    }
-    else if (id == 3)
-    {
-        appliedTrajMarker.color.r = 1.00;
-        appliedTrajMarker.color.g = 0.00;
-        appliedTrajMarker.color.b = 1.00;            
-    }
-    else if (id == 4)
-    {
-        appliedTrajMarker.color.r = 0.10;
-        appliedTrajMarker.color.g = 0.65;
-        appliedTrajMarker.color.b = 0.10;
-    }
-    else if (id == 5)
-    {
-        appliedTrajMarker.color.r = 0.00;
-        appliedTrajMarker.color.g = 0.00;
-        appliedTrajMarker.color.b = 0.00;
-    }
-    else
-    {
-        appliedTrajMarker.color.r = 0.93;
-        appliedTrajMarker.color.g = 0.48;
-        appliedTrajMarker.color.b = 0.26;
-    }
-        
-    if (route.size() > 0)
-    {
-        bool first = true;
-        Vector3d last;
-        for (auto it : route)
-        {
-            if (first)
-            {
-                first = false;
-                last = it;
-                continue;
-            }
-            geometry_msgs::Point point;
-
-            point.x = last(0);
-            point.y = last(1);
-            point.z = last(2);
-            routeMarker.points.push_back(point);
-            point.x = it(0);
-            point.y = it(1);
-            point.z = it(2);
-            routeMarker.points.push_back(point);
-            last = it;
-
-            wayPointsMarker.points.push_back(point);
-        }
-
-        routePub.publish(routeMarker);
-    }
-
-    if (route.size() > 0)
-    {
-        for (auto it : route)
-        {
-            geometry_msgs::Point point;
-            point.x = it(0);
-            point.y = it(1);
-            point.z = it(2);
-            wayPointsMarker.points.push_back(point);
-        }
-
-        wayPointsPub.publish(wayPointsMarker);
-    }
-
-    if (appliedTraj.getPieceNum() > 0)
-    {
-        double T = 0.01;
-        Vector3d lastX = appliedTraj.getPos(0.0);
-        for (double t = T; t < appliedTraj.getTotalDuration(); t += T)
-        {
-            geometry_msgs::Point point;
-            Vector3d X = appliedTraj.getPos(t);
-            point.x = lastX(0);
-            point.y = lastX(1);
-            point.z = lastX(2);
-            appliedTrajMarker.points.push_back(point);
-            point.x = X(0);
-            point.y = X(1);
-            point.z = X(2);
-            appliedTrajMarker.points.push_back(point);
-            lastX = X;
-        }
-        appliedTrajectoryPub.publish(appliedTrajMarker);
-    }
 }

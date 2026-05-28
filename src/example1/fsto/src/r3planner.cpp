@@ -199,13 +199,13 @@ double R3Planner::plan(const Vector3d &s,
 
     if (!MapPtr->safeQuery(s, config.r3SafeRadius))
     {
-        ROS_WARN("[R3Planner] Start is unsafe.");
+        ROS_WARN("[R3Planner] Start (%.2f,%.2f,%.2f) is unsafe.", s(0),s(1),s(2));
         return INFINITY;
     }
 
     if (!MapPtr->safeQuery(g, config.r3SafeRadius))
     {
-        ROS_WARN("[R3Planner] Goal is unsafe.");
+        ROS_WARN("[R3Planner] Goal (%.2f,%.2f,%.2f) is unsafe.", g(0),g(1),g(2));
         return INFINITY;
     }
 

@@ -203,7 +203,7 @@
     <param name="map/z_size"     value="$(arg map_size_z)" />
 
     <param name="map/circle_num" value="0"/>        
-    <param name="map/obs_num"    value="200"/>        
+    <param name="map/obs_num"    value="180"/>        
     <param name="map/resolution" value="0.1"/>        
     <param name="map/random_seed" value="42"/>        
 
