@@ -172,6 +172,9 @@
  <node name="rviz" pkg="rviz" type="rviz" output="screen"
        args="-d $(find cascade_controller)/cfg/rviz_config.rviz"> 
 </node>
+ <node name="rviz_Top" pkg="rviz" type="rviz" output="screen"
+       args="-d $(find cascade_controller)/cfg/rviz_Top_config.rviz"> 
+</node>
  <node name="rviz_FPS" pkg="rviz" type="rviz" output="screen"
        args="-d $(find cascade_controller)/cfg/rviz_FPS_config.rviz"> 
 </node>
@@ -203,7 +206,7 @@
     <param name="map/z_size"     value="$(arg map_size_z)" />
 
     <param name="map/circle_num" value="0"/>        
-    <param name="map/obs_num"    value="200"/>        
+    <param name="map/obs_num"    value="180"/>        
     <param name="map/resolution" value="0.1"/>        
     <param name="map/random_seed" value="42"/>        
 
