@@ -66,7 +66,7 @@ Local_goal_ratio:           0.90   # local goal = Local_goal_ratio * sensing rad
 Replan_time_ahead:          0.35   # 旧轨迹前向拼接点
 Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
 Reuse_traj_time:            1.00   # s，从旧轨迹前向拼接点开始，最多复用旧轨迹未来多长时间
-Reuse_traj_dt:              0.50   # s，构造 reusedPrefix 的采样间隔
+Reuse_traj_dt:              0.80   # s，构造 reusedPrefix 的采样间隔
 
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间

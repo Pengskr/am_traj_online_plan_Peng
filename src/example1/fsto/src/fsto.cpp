@@ -829,7 +829,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
     }
 
     // 可视化最终 route：reusedPrefix + simplified rrt tail
-    // visualization.visualizeRoute(route, ros::Time::now(), 2);
+    visualization.visualizeRoute(route, ros::Time::now(), 2);
 
     // ============================================================
     // 4. 生成末端速度。

@@ -27,8 +27,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
 
     if (route.size() < 2 || (route[0] - route[1]).squaredNorm() < FLT_EPSILON) return traj;
 
-    // std::string result_dir = "/home/peng/Desktop/am_traj_Peng/src/example1/results/";
-
     int tries = 0;
     do
     {
@@ -54,20 +52,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
             cout << "Number of Traj Pieces: " << traj.getPieceNum() << endl;
             cout << "t_lap: " << traj.getTotalDuration() << endl;
             cout << "cost: " << trajOpt.evaluateObjective(traj) << endl;
-
-            // // 保存 位置，速度，加速度曲线，用于MATLAB绘制
-            // std::ofstream csv_green_pva(result_dir + "GREEN_constrained-AM-pva.csv");
-            // for(double t_cur = 0.0; t_cur <= traj.getTotalDuration(); t_cur += 0.01)
-            // {
-            //     Eigen::Vector3d pos = traj.getPos(t_cur);
-            //     double x = pos(0);
-            //     double y = pos(1);
-            //     double z = pos(2);
-            //     csv_green_pva << t_cur << "," << x << "," << y << "," << z << "," << traj.getVel(t_cur).norm() << "," << traj.getAcc(t_cur).norm() << "\n";
-
-            // }
-            // csv_green_pva.close();
-            // std::cout << "Saved CSV file" << std::endl;
         }
         else if(id_alg == 3){
             traj = trajOpt.genOptimalTrajDTCs3(route, initialVel, initialAcc, finalVel, finalAcc);    //精细化有约束交替优化
@@ -76,20 +60,6 @@ Trajectory TrajGen::generate(vector<Vector3d> &route,
             cout << "Number of Traj Pieces: " << traj.getPieceNum() << endl;
             cout << "t_lap: " << traj.getTotalDuration() << endl;
             cout << "cost: " << trajOpt.evaluateObjective(traj) << endl;
-
-            // // 保存 位置，速度，加速度曲线，用于MATLAB绘制
-            // std::ofstream csv_yellow_pva(result_dir + "YELLOW_constrained-AM-pva.csv");
-            // for(double t_cur = 0.0; t_cur <= traj.getTotalDuration(); t_cur += 0.01)
-            // {
-            //     Eigen::Vector3d pos = traj.getPos(t_cur);
-            //     double x = pos(0);
-            //     double y = pos(1);
-            //     double z = pos(2);
-            //     csv_yellow_pva << t_cur << "," << x << "," << y << "," << z << "," << traj.getVel(t_cur).norm() << "," << traj.getAcc(t_cur).norm() << "\n";
-
-            // }
-            // csv_yellow_pva.close();
-            // std::cout << "Saved CSV file" << std::endl;
         }
     } while (!trajSafeCheck(traj, route));  // 避障安全检查
 
