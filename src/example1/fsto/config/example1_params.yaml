@@ -41,7 +41,7 @@ MaxAccRate:                  2.00
 
 MaxVelRate:                  4.00
 
-WeightT:                     128.0
+WeightT:                     1024.0
 
 WeightAcc:                   0.0
 
@@ -74,7 +74,7 @@ Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
 Local_goal_speed:           0.2
 
 # 算法选择
-Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
+Alg:                         2      # 2 - 时域缩放； 3 - 精细化局部约束处理
 
 # Flight mode
 # 1: click goal mode

@@ -10,7 +10,8 @@
 #include <iostream>
 #include <memory>
 #include <cmath>
-
+#include <mutex>
+#include <vector>
 #include <ros/ros.h>
 #include <ros/console.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -69,7 +70,7 @@ public:
 
     void tryReplan(const ros::Time &stamp);
 
-    bool planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &stamp);
+    bool planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &stamp, double goalSelectTimeMs);
 
     bool checkCurrentTrajSafe(const ros::Time &stamp) const;
 
@@ -107,6 +108,25 @@ public:
     void initPresetWaypoints();
     void startPresetWaypointMission();
     void updateWaypointMission();
+
+    // ===== Timing statistics =====
+    std::vector<double> localMapUpdateTimeMs;
+    std::vector<double> pathPlanningTimeMs;
+    std::vector<double> startGoalTimeMs;
+    std::vector<double> r3SearchTimeMs;
+    std::vector<double> trajGenTimeMs;
+
+
+    std::mutex timingMutex;
+    bool timingStatsPrinted;
+
+    void recordTimingSample(std::vector<double> &samples, double valueMs);
+    void resetTimingStatistics();
+    void printTimingStatistics();
+
+    static double computeMean(const std::vector<double> &samples);
+    static double computeStd(const std::vector<double> &samples);
+    static double computeMax(const std::vector<double> &samples);
 };
 
 #endif

@@ -1,5 +1,9 @@
 #include <fsto/fsto.h>
 #include <limits>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
+#include <cmath>
 
 using namespace std;
 using namespace ros;
@@ -12,6 +16,7 @@ MavGlobalPlanner::MavGlobalPlanner(Config &conf, NodeHandle &nh_)
       hasActiveTraj(false),
       currentWaypointId(0),
       lastReplanTime(ros::Time(0)),
+      timingStatsPrinted(false),
       glbMapPtr(make_shared<PriorGlobalMap>(config)),
       localMapPtr(make_shared<LocalPerceptionMap>(config)),
       r3planner(config, localMapPtr),
@@ -41,6 +46,128 @@ MavGlobalPlanner::~MavGlobalPlanner()
 {
 }
 
+void MavGlobalPlanner::recordTimingSample(std::vector<double> &samples, double valueMs)
+{
+    if (!std::isfinite(valueMs) || valueMs < 0.0)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(timingMutex);
+    samples.push_back(valueMs);
+}
+
+void MavGlobalPlanner::resetTimingStatistics()
+{
+    std::lock_guard<std::mutex> lock(timingMutex);
+
+    localMapUpdateTimeMs.clear();
+    startGoalTimeMs.clear();
+    r3SearchTimeMs.clear();
+    pathPlanningTimeMs.clear();
+    trajGenTimeMs.clear();
+
+    timingStatsPrinted = false;
+}
+
+double MavGlobalPlanner::computeMean(const std::vector<double> &samples)
+{
+    if (samples.empty())
+    {
+        return 0.0;
+    }
+
+    double sum = 0.0;
+    for (double x : samples)
+    {
+        sum += x;
+    }
+
+    return sum / static_cast<double>(samples.size());
+}
+
+double MavGlobalPlanner::computeStd(const std::vector<double> &samples)
+{
+    if (samples.empty())
+    {
+        return 0.0;
+    }
+
+    const double mean = computeMean(samples);
+
+    double var = 0.0;
+    for (double x : samples)
+    {
+        const double d = x - mean;
+        var += d * d;
+    }
+
+    var /= static_cast<double>(samples.size()-1);
+
+    return std::sqrt(var);
+}
+
+double MavGlobalPlanner::computeMax(const std::vector<double> &samples)
+{
+    if (samples.empty())
+    {
+        return 0.0;
+    }
+
+    return *std::max_element(samples.begin(), samples.end());
+}
+
+void MavGlobalPlanner::printTimingStatistics()
+{
+    std::lock_guard<std::mutex> lock(timingMutex);
+
+    if (timingStatsPrinted)
+    {
+        return;
+    }
+
+    timingStatsPrinted = true;
+
+    auto appendRow = [](std::ostringstream &oss,
+                        const std::string &name,
+                        const std::vector<double> &samples) {
+        const double mean = MavGlobalPlanner::computeMean(samples);
+        const double stdv = MavGlobalPlanner::computeStd(samples);
+        const double maxv = MavGlobalPlanner::computeMax(samples);
+
+        oss << std::left << std::setw(36) << name
+            << std::right << std::setw(10) << samples.size()
+            << std::setw(14) << std::fixed << std::setprecision(3) << mean
+            << std::setw(14) << std::fixed << std::setprecision(3) << stdv
+            << std::setw(14) << std::fixed << std::setprecision(3) << maxv
+            << "\n";
+    };
+
+    std::ostringstream oss;
+
+    oss << "\n";
+    oss << "==================== Replanning Timing Statistics ====================\n";
+    oss << "Unit: ms\n";
+    oss << "----------------------------------------------------------------------\n";
+    oss << std::left << std::setw(36) << "Metric"
+        << std::right << std::setw(10) << "Count"
+        << std::setw(14) << "Mean"
+        << std::setw(14) << "Std"
+        << std::setw(14) << "Max"
+        << "\n";
+    oss << "----------------------------------------------------------------------\n";
+
+    appendRow(oss, "Local map update", localMapUpdateTimeMs);
+    appendRow(oss, "Path planning", pathPlanningTimeMs);
+    appendRow(oss, "  Path start/goal preparation", startGoalTimeMs);
+    appendRow(oss, "  R3Planner search", r3SearchTimeMs);
+    appendRow(oss, "Trajectory planning", trajGenTimeMs);
+
+    oss << "----------------------------------------------------------------------\n";
+
+    ROS_WARN_STREAM(oss.str());
+}
+
 void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
 {
     Translation3d tranOdomBody(msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
@@ -57,10 +184,16 @@ void MavGlobalPlanner::odomCallBack(const nav_msgs::Odometry::ConstPtr &msg)
 
     if (mapInitialized && (msg->header.stamp - last_local_map_update_time).toSec() > local_map_update_dt)
     {
+        const ros::WallTime map_t0 = ros::WallTime::now();
+
         // 更新
         Eigen::Vector3d current_pos = curOdomPose.translation();
         localMapPtr->buildLocalMapFromGlobal(*glbMapPtr, current_pos, config.sensingRadius);
         localMapInitialized = true;
+
+        const double map_update_ms = (ros::WallTime::now() - map_t0).toSec() * 1000.0;
+        recordTimingSample(localMapUpdateTimeMs, map_update_ms);
+
         // 发布
         sensor_msgs::PointCloud2 inflate_msg;
         localMapPtr->getLocalInflatedMap(inflate_msg, current_pos, config.sensingRadius);
@@ -136,6 +269,7 @@ void MavGlobalPlanner::targetCallBack(const geometry_msgs::PoseStamped::ConstPtr
     hasTarget = true;
     hasActiveTraj = false;
     lastReplanTime = ros::Time(0);
+    resetTimingStatistics();
 
     ROS_WARN("[targetCallBack] New clicked global goal received.");
 
@@ -161,6 +295,9 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     if (config.flight_mode == 1 && (globalGoal - curOdomPose.translation()).norm() < config.waypoint_reach_thresh)
     {
         ROS_WARN("[tryReplan] Global goal reached.");
+
+        printTimingStatistics();
+
         hasTarget = false;
         hasActiveTraj = false;
         return;
@@ -210,6 +347,8 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     // }
 
     // ------------------------- 获取重规划的终点 -------------------------- //
+    const ros::WallTime goal_select_t0 = ros::WallTime::now();
+
     // 获取局部目标选择用的参考起点(旧轨迹前向拼接点)。有有效轨迹时使用旧轨迹前向拼接点；否则使用当前 odom。
     Eigen::Vector3d goalSelectStart = curOdomPose.translation();
 
@@ -233,6 +372,8 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
 
     const Eigen::Vector3d localGoal = selectLocalGoal(goalSelectStart);
 
+    const double goal_select_ms = (ros::WallTime::now() - goal_select_t0).toSec() * 1000.0;
+
     if (!localMapPtr->safeQuery(localGoal, config.bodySafeRadius))
     {
         ROS_WARN("[tryReplan] localGoal (%.2f,%.2f,%.2f) is unsafe.", localGoal(0),localGoal(1),localGoal(2));
@@ -249,7 +390,7 @@ void MavGlobalPlanner::tryReplan(const ros::Time &stamp)
     }
 
     // ------------------------- 重规划 -------------------------- //
-    const bool success = planAndPublishLocalTraj(localGoal, stamp);
+    const bool success = planAndPublishLocalTraj(localGoal, stamp, goal_select_ms);
 
     if (success)
     {
@@ -691,6 +832,7 @@ void MavGlobalPlanner::startPresetWaypointMission()
     hasTarget = true;
     hasActiveTraj = false;
     lastReplanTime = ros::Time(0);
+    resetTimingStatistics();
 
     ROS_WARN("[startPresetWaypointMission] Start mission. Current waypoint = %d / %lu",
              currentWaypointId + 1,
@@ -714,6 +856,9 @@ void MavGlobalPlanner::updateWaypointMission()
     if (currentWaypointId >= static_cast<int>(presetWaypoints.size()))
     {
         ROS_WARN("[updateWaypointMission] Mission completed.");
+
+        printTimingStatistics();
+
         hasTarget = false;
         hasActiveTraj = false;
         return;
@@ -754,7 +899,7 @@ void MavGlobalPlanner::initPresetWaypoints()
     ROS_WARN("[initPresetWaypoints] Loaded %lu preset waypoints.", presetWaypoints.size());
 }
 
-bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &trajStartStampInput)
+bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, const ros::Time &trajStartStampInput, double goalSelectTimeMs)
 {
     // ============================================================
     // 1. 构造复用前缀：
@@ -768,16 +913,22 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
     Eigen::Vector3d trajStartAcc;
     ros::Time actualTrajStartStamp;
 
+    const ros::WallTime prefix_t0 = ros::WallTime::now();
+
     if (!buildReusedPrefix(odomStamp,
-                           route,
-                           trajStartPos,
-                           trajStartVel,
-                           trajStartAcc,
-                           actualTrajStartStamp))
+                        route,
+                        trajStartPos,
+                        trajStartVel,
+                        trajStartAcc,
+                        actualTrajStartStamp))
     {
         ROS_WARN("[planAndPublishLocalTraj] Failed to build reused prefix.");
         return false;
     }
+
+    const double prefix_build_ms = (ros::WallTime::now() - prefix_t0).toSec() * 1000.0;
+    const double start_goal_ms = goalSelectTimeMs + prefix_build_ms;
+    recordTimingSample(startGoalTimeMs, start_goal_ms);
 
     if (route.empty())
     {
@@ -805,7 +956,13 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
     // ============================================================
     std::vector<Eigen::Vector3d> rrtRoute;
 
+    const ros::WallTime rrt_t0 = ros::WallTime::now();
+
     const double rrt_cost = r3planner.planOnce(rrtStart, goal, rrtRoute);
+
+    const double rrt_search_ms = (ros::WallTime::now() - rrt_t0).toSec() * 1000.0;
+    recordTimingSample(r3SearchTimeMs, rrt_search_ms);
+    recordTimingSample(pathPlanningTimeMs, start_goal_ms + rrt_search_ms);
 
     if (!std::isfinite(rrt_cost) || rrtRoute.size() <= 1)
     {
@@ -893,6 +1050,8 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
     //    route 前缀复用旧轨迹安全前视段；
     //    RRT tail 提供后续绕障路径。
     // ============================================================
+    const ros::WallTime traj_t0 = ros::WallTime::now();
+
     Trajectory traj = trajGen.generate(route,
                                        trajStartVel,
                                        trajStartAcc,
@@ -900,6 +1059,9 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
                                        finAcc,
                                        config.alg,
                                        visualization);
+
+    const double traj_gen_ms = (ros::WallTime::now() - traj_t0).toSec() * 1000.0;
+    recordTimingSample(trajGenTimeMs, traj_gen_ms);
 
     // ============================================================
     // 6. 轨迹发布
@@ -1081,7 +1243,7 @@ void Visualization::visualize(const Trajectory &appliedTraj, const vector<Vector
     appliedTrajMarker.header.frame_id = config.odomFrame;
     appliedTrajMarker.id = id;
     appliedTrajMarker.ns = "trajectory";
-    appliedTrajMarker.scale.x = 0.05;
+    appliedTrajMarker.scale.x = 0.10;
     if (id == 0)
     {
         appliedTrajMarker.color.r = 0.85;

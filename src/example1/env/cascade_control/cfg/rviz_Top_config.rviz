@@ -160,7 +160,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.349999904632568
+            Max Value: 5.25
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -249,7 +249,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 67.92046356201172
+      Scale: 52.59760665893555
       Target Frame: drone1
       Value: TopDownOrtho (rviz)
       X: 0.09693244099617004
