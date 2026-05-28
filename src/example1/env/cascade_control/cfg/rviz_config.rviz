@@ -8,10 +8,10 @@ Panels:
         - /Drone1
         - /Map1
         - /Map1/GlobalMap1/Autocompute Value Bounds1
-        - /Map1/LocalInflateMap1
         - /Optimal traj1
         - /Waypoints1
-        - /Path1/Namespaces1
+        - /Route1
+        - /Route1/Namespaces1
       Splitter Ratio: 0.5472221970558167
     Tree Height: 961
   - Class: rviz/Selection
@@ -161,7 +161,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.25
+            Max Value: 5.349999904632568
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -189,27 +189,28 @@ Visualization Manager:
       Enabled: true
       Name: Map
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        trajectory: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
-      Enabled: true
+      Enabled: false
       Marker Topic: /fsto/visualization/waypoints
       Name: Waypoints
       Namespaces:
-        waypoints: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /fsto/visualization/route
-      Name: Path
+      Name: Route
       Namespaces:
-        route: true
+        route_line: true
+        route_points: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -249,11 +250,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 46.7901611328125
+      Scale: 71.52008819580078
       Target Frame: drone1
       Value: TopDownOrtho (rviz)
-      X: 1.2280728816986084
-      Y: 4.74013614654541
+      X: 0.8682050108909607
+      Y: -1.2783008813858032
     Saved:
       - Class: rviz/ThirdPersonFollower
         Distance: 4.048277378082275

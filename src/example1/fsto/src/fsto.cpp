@@ -616,12 +616,12 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                                                const Eigen::Vector3d &goal,
                                                const ros::Time &trajStartStamp)
 {
+    // ----------------------- 路径规划 r3planner ----------------------- //
     std::vector<Eigen::Vector3d> route;
 
     std::cout << "[planAndPublishLocalTraj] start of r3planner:" << startPos << "goal of r3planner:" << goal << std::endl;
     double rrt_cost = r3planner.planOnce(startPos, startVel, goal, route);
-    visualization
-
+    
     if (!std::isfinite(rrt_cost) || route.size() <= 1)
     {
         ROS_WARN("[planAndPublishLocalTraj] Directional R3Planner failed. Retry without direction constraint.");
@@ -629,23 +629,24 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
         route.clear();
         rrt_cost = r3planner.planOnce(startPos, goal, route);
     }
-
     if (!std::isfinite(rrt_cost) || route.size() <= 1)
     {
         ROS_WARN("[planAndPublishLocalTraj] R3Planner failed.");
         return false;
     }
+    // visualization.visualizeRoute(route, ros::Time::now(), 1);
 
+    // LOS简化路径
     route = trajGen.routeSimplify(route, config.spatialResolution);
     if (route.size() <= 1)
     {
         ROS_WARN("[planAndPublishLocalTraj] Route invalid after LOS simplify.");
         return false;
     }
+    visualization.visualizeRoute(route, ros::Time::now(), 2);
 
-    // ============================================================
-    // RRT 搜索耗时后，重新用当前 odom 修正 route 头部和轨迹初始状态
-    // ============================================================
+
+    // ----------------------- RRT 搜索耗时后，重新用当前 odom 修正 route 头部和轨迹初始状态 ----------------------- //
     Eigen::Vector3d trajStartPos = startPos;
     Eigen::Vector3d trajStartVel = startVel;
     Eigen::Vector3d trajStartAcc = startAcc;
@@ -749,7 +750,8 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
     ROS_WARN("[planAndPublishLocalTraj] Terminal velocity set by route tangent: "
              "vx=%.3f, vy=%.3f, vz=%.3f, speed=%.3f",
              finVel(0), finVel(1), finVel(2), finVel.norm());
-
+    
+    // ----------------------- 轨迹规划 AM ----------------------- //
     Trajectory traj = trajGen.generate(route,
                                        trajStartVel,
                                        trajStartAcc,
@@ -758,6 +760,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &startPos,
                                        config.alg,
                                        visualization);
 
+    // ----------------------- 轨迹发布 ----------------------- //
     if (traj.getPieceNum() <= 0)
     {
         ROS_WARN("[planAndPublishLocalTraj] TrajGen failed.");
@@ -984,4 +987,189 @@ void MavGlobalPlanner::polynomialTrajConverter(const Trajectory &traj,
 
     trajMsg.mag_coeff = 1.0;
     trajMsg.debug_info = "";
+}
+
+Visualization::Visualization(Config &conf, NodeHandle &nh_)
+    : config(conf), nh(nh_)
+{
+    routePub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/route", 1);
+    wayPointsPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/waypoints", 1);
+    appliedTrajectoryPub = nh.advertise<visualization_msgs::Marker>("/fsto/visualization/applied_trajectory", 1);
+}
+
+void Visualization::visualize(const Trajectory &appliedTraj, const vector<Vector3d> &route, Time timeStamp, int id)
+{
+    visualization_msgs::Marker routeMarker, wayPointsMarker, appliedTrajMarker;
+
+    routeMarker.id = id;
+    routeMarker.type = visualization_msgs::Marker::LINE_LIST;
+    routeMarker.header.stamp = timeStamp;
+    routeMarker.header.frame_id = config.odomFrame;
+    routeMarker.pose.orientation.w = 1.00;
+    routeMarker.action = visualization_msgs::Marker::ADD;
+    routeMarker.ns = "route";
+    routeMarker.color.r = 1.00;
+    routeMarker.color.g = 0.00;
+    routeMarker.color.b = 0.00;
+    routeMarker.color.a = 1.00;
+    routeMarker.scale.x = 0.10;
+
+    wayPointsMarker = routeMarker;
+    wayPointsMarker.type = visualization_msgs::Marker::SPHERE_LIST;
+    wayPointsMarker.ns = "waypoints";
+    wayPointsMarker.color.r = 0.00;
+    wayPointsMarker.color.g = 0.00;
+    wayPointsMarker.color.b = 1.00;
+    wayPointsMarker.scale.x = 0.20;
+    wayPointsMarker.scale.y = 0.20;
+    wayPointsMarker.scale.z = 0.20;
+
+    appliedTrajMarker = routeMarker;
+    appliedTrajMarker.header.frame_id = config.odomFrame;
+    appliedTrajMarker.id = id;
+    appliedTrajMarker.ns = "trajectory";
+    appliedTrajMarker.scale.x = 0.05;
+    if (id == 0)
+    {
+        appliedTrajMarker.color.r = 0.85;
+        appliedTrajMarker.color.g = 0.10;
+        appliedTrajMarker.color.b = 0.10;
+    }
+    else if (id == 1)
+    {
+        appliedTrajMarker.color.r = 1.00;
+        appliedTrajMarker.color.g = 0.65;
+        appliedTrajMarker.color.b = 0.00;
+    }        
+    else if (id == 2)
+    {
+        appliedTrajMarker.color.r = 0.00;
+        appliedTrajMarker.color.g = 0.45;
+        appliedTrajMarker.color.b = 0.74;
+    }
+    else if (id == 3)
+    {
+        appliedTrajMarker.color.r = 1.00;
+        appliedTrajMarker.color.g = 0.00;
+        appliedTrajMarker.color.b = 1.00;            
+    }
+    else if (id == 4)
+    {
+        appliedTrajMarker.color.r = 0.10;
+        appliedTrajMarker.color.g = 0.65;
+        appliedTrajMarker.color.b = 0.10;
+    }
+    else if (id == 5)
+    {
+        appliedTrajMarker.color.r = 0.00;
+        appliedTrajMarker.color.g = 0.00;
+        appliedTrajMarker.color.b = 0.00;
+    }
+    else
+    {
+        appliedTrajMarker.color.r = 0.93;
+        appliedTrajMarker.color.g = 0.48;
+        appliedTrajMarker.color.b = 0.26;
+    }
+    
+    // if (route.size() > 0)
+    // {
+    //     for (auto it : route)
+    //     {
+    //         geometry_msgs::Point point;
+    //         point.x = it(0);
+    //         point.y = it(1);
+    //         point.z = it(2);
+    //         wayPointsMarker.points.push_back(point);
+    //     }
+
+    //     wayPointsPub.publish(wayPointsMarker);
+    // }
+
+    if (appliedTraj.getPieceNum() > 0)
+    {
+        double T = 0.01;
+        Vector3d lastX = appliedTraj.getPos(0.0);
+        for (double t = T; t < appliedTraj.getTotalDuration(); t += T)
+        {
+            geometry_msgs::Point point;
+            Vector3d X = appliedTraj.getPos(t);
+            point.x = lastX(0);
+            point.y = lastX(1);
+            point.z = lastX(2);
+            appliedTrajMarker.points.push_back(point);
+            point.x = X(0);
+            point.y = X(1);
+            point.z = X(2);
+            appliedTrajMarker.points.push_back(point);
+            lastX = X;
+        }
+        appliedTrajectoryPub.publish(appliedTrajMarker);
+    }
+}
+
+void Visualization::visualizeRoute(const std::vector<Eigen::Vector3d> &route,
+                                   ros::Time timeStamp,
+                                   int id)
+{
+    if (route.empty())
+        return;
+
+    // ============================================================
+    // 航点之间用直线连接
+    // ============================================================
+    visualization_msgs::Marker lineMarker;
+    lineMarker.header.stamp = timeStamp;
+    lineMarker.header.frame_id = config.odomFrame;
+    lineMarker.ns = "route_line";
+    lineMarker.id = id * 2;
+    lineMarker.type = visualization_msgs::Marker::LINE_STRIP;
+    lineMarker.action = visualization_msgs::Marker::ADD;
+    lineMarker.pose.orientation.w = 1.0;
+    lineMarker.scale.x = 0.05;
+    lineMarker.color.a = 1.0f;
+    
+    // 根据 id 设置颜色
+    if (id == 1)          { lineMarker.scale.x *= 1; lineMarker.color.r = 0.0f; lineMarker.color.g = 0.0f; lineMarker.color.b = 1.0f; } // 蓝色  r3planner的结果
+    else if (id == 2)     { lineMarker.scale.x *= 2; lineMarker.color.r = 0.8f; lineMarker.color.g = 0.0f; lineMarker.color.b = 1.0f; } // 紫色  r3planner routeSimplify后的结果
+    else if (id == 3)     { lineMarker.scale.x *= 1; lineMarker.color.r = 0.0f; lineMarker.color.g = 1.0f; lineMarker.color.b = 0.0f; } // 绿色  repair 后的结果
+    else                  { lineMarker.scale.x *= 1; lineMarker.color.r = 1.0f; lineMarker.color.g = 1.0f; lineMarker.color.b = 0.0f; } // 黄色
+    
+    for (const auto &p : route)
+    {
+        geometry_msgs::Point pt;
+        pt.x = p.x();
+        pt.y = p.y();
+        pt.z = p.z();
+        lineMarker.points.push_back(pt);
+    }
+
+    routePub.publish(lineMarker);
+
+    // ============================================================
+    // 显示航点
+    // ============================================================
+    visualization_msgs::Marker pointMarker;
+    pointMarker.header.stamp = timeStamp;
+    pointMarker.header.frame_id = config.odomFrame;
+    pointMarker.ns = "route_points";
+    pointMarker.id = id * 2 + 1;
+    pointMarker.type = visualization_msgs::Marker::SPHERE_LIST;
+    pointMarker.action = visualization_msgs::Marker::ADD;
+    pointMarker.pose.orientation.w = 1.0;
+    pointMarker.color = lineMarker.color;
+    pointMarker.scale.x = lineMarker.scale.x*3;
+    pointMarker.scale.y = pointMarker.scale.x;
+    pointMarker.scale.z = pointMarker.scale.x;
+
+    for (const auto &p : route)
+    {
+        geometry_msgs::Point pt;
+        pt.x = p.x();
+        pt.y = p.y();
+        pt.z = p.z();
+        pointMarker.points.push_back(pt);
+    }
+
+    routePub.publish(pointMarker);
 }

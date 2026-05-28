@@ -16,12 +16,11 @@ public:
     ros::NodeHandle nh;
 
     ros::Publisher routePub;
-    ros::Publisher routeR3plannerPub;
     ros::Publisher wayPointsPub;
     ros::Publisher appliedTrajectoryPub;
 
     void visualize(const Trajectory &appliedTraj, const std::vector<Eigen::Vector3d> &route, ros::Time timeStamp, int id);
-    void visualizeR3planner(const std::vector<Eigen::Vector3d> &route, ros::Time timeStamp, int id);
+    void visualizeRoute(const std::vector<Eigen::Vector3d> &route, ros::Time timeStamp, int id);
 };
 
 class TrajGen
