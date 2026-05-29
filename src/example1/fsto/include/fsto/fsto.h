@@ -115,6 +115,7 @@ public:
     std::vector<double> startGoalTimeMs;
     std::vector<double> r3SearchTimeMs;
     std::vector<double> trajGenTimeMs;
+    std::vector<double> cost;
 
 
     std::mutex timingMutex;

@@ -37,7 +37,7 @@ R3_cost_improvement_threshold:    0.50    # m，cost 降低小于该值认为没
 
 TryOut:                      5
 
-MaxAccRate:                  3.00   # 如果发现无人机有异常的原地转圈，说明速度方向来不及改变，即即加速度太小
+MaxAccRate:                  4.00   # 如果发现无人机有异常的原地转圈，说明速度方向来不及改变，即即加速度太小
 
 MaxVelRate:                  6.00
 
@@ -71,10 +71,10 @@ Reuse_traj_dt:              0.80   # s，构造 reusedPrefix 的采样间隔
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
-Local_goal_speed:           0.20
+Local_goal_speed:           0.10
 
 # 算法选择
-Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
+Alg:                         2      # 2 - 时域缩放； 3 - 精细化局部约束处理
 
 # Flight mode
 # 1: click goal mode
@@ -88,6 +88,6 @@ Preset_waypoints:            [
                               -9.0, 0.0, 1.0,
                               # -4.0, 5.0, 2.0,
                                0.0, 7.0, 2.0,
-                               9.0, -2.0, 1.0,
+                               8.0, -1.0, 1.0,
                                1.0, -9.0, 0.1
                              ]

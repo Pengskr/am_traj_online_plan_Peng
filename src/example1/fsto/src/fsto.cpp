@@ -66,6 +66,7 @@ void MavGlobalPlanner::resetTimingStatistics()
     r3SearchTimeMs.clear();
     pathPlanningTimeMs.clear();
     trajGenTimeMs.clear();
+    cost.clear();
 
     timingStatsPrinted = false;
 }
@@ -162,6 +163,10 @@ void MavGlobalPlanner::printTimingStatistics()
     appendRow(oss, "  Path start/goal preparation", startGoalTimeMs);
     appendRow(oss, "  R3Planner search", r3SearchTimeMs);
     appendRow(oss, "Trajectory planning", trajGenTimeMs);
+
+    oss << "----------------------------------------------------------------------\n";
+
+    appendRow(oss, "Cost trajectory", cost);
 
     oss << "----------------------------------------------------------------------\n";
 
@@ -1062,6 +1067,7 @@ bool MavGlobalPlanner::planAndPublishLocalTraj(const Eigen::Vector3d &goal, cons
 
     const double traj_gen_ms = (ros::WallTime::now() - traj_t0).toSec() * 1000.0;
     recordTimingSample(trajGenTimeMs, traj_gen_ms);
+    recordTimingSample(cost, trajGen.trajOpt.evaluateObjective(traj));
 
     // ============================================================
     // 6. 轨迹发布

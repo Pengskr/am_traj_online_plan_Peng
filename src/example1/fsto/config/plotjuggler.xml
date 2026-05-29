@@ -1,45 +1,45 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <root>
- <tabbed_widget parent="main_window" name="Main Window">
+ <tabbed_widget name="Main Window" parent="main_window">
   <Tab tab_name="tab1" containers="1">
    <Container>
-    <DockSplitter count="2" orientation="-" sizes="0.500501;0.499499">
-     <DockSplitter count="2" orientation="|" sizes="0.5;0.5">
+    <DockSplitter orientation="-" sizes="0.50134;0.49866" count="2">
+     <DockSplitter orientation="|" sizes="0.500468;0.499532" count="2">
       <DockArea name="...">
-       <plot style="Lines" flip_x="false" flip_y="false" mode="TimeSeries">
-        <range top="1.250040" right="20.029307" bottom="-9.250295" left="0.003600"/>
+       <plot style="Lines" mode="TimeSeries" flip_y="false" flip_x="false">
+        <range bottom="-9.815444" top="3.384466" left="0.002205" right="24.003133"/>
         <limitY/>
-        <curve name="/drone_1/position_cmd/position/x" color="#1f77b4"/>
-        <curve name="/drone_1/position_cmd/position/y" color="#d62728"/>
-        <curve name="/drone_1/position_cmd/position/z" color="#1ac938"/>
-        <curve name="/drone_1/visual_slam/odom/pose/pose/position/x" color="#d62728"/>
-        <curve name="/drone_1/visual_slam/odom/pose/pose/position/y" color="#1ac938"/>
-        <curve name="/drone_1/visual_slam/odom/pose/pose/position/z" color="#ff7f0e"/>
+        <curve name="/drone_1/position_cmd/position/x" color="#0e2bff"/>
+        <curve name="/drone_1/position_cmd/position/y" color="#f1504c"/>
+        <curve name="/drone_1/position_cmd/position/z" color="#67bd6f"/>
+        <curve name="/drone_1/visual_slam/odom/pose/pose/position/x" color="#ced627"/>
+        <curve name="/drone_1/visual_slam/odom/pose/pose/position/y" color="#1abbc9"/>
+        <curve name="/drone_1/visual_slam/odom/pose/pose/position/z" color="#ff0ee9"/>
        </plot>
       </DockArea>
       <DockArea name="...">
-       <plot style="Lines" flip_x="false" flip_y="false" mode="TimeSeries">
-        <range top="0.100000" right="20.023775" bottom="-0.100000" left="0.000000"/>
+       <plot style="Lines" mode="TimeSeries" flip_y="false" flip_x="false">
+        <range bottom="-2.904877" top="3.190448" left="0.000000" right="24.000222"/>
         <limitY/>
-        <curve name="/drone_1/position_cmd/velocity/x" color="#ff7f0e"/>
-        <curve name="/drone_1/position_cmd/velocity/y" color="#f14cc1"/>
-        <curve name="/drone_1/position_cmd/velocity/z" color="#9467bd"/>
+        <curve name="/drone_1/position_cmd/velocity/x" color="#17becf"/>
+        <curve name="/drone_1/position_cmd/velocity/y" color="#bcbd22"/>
+        <curve name="/drone_1/position_cmd/velocity/z" color="#1f77b4"/>
        </plot>
       </DockArea>
      </DockSplitter>
-     <DockSplitter count="2" orientation="|" sizes="0.5;0.5">
+     <DockSplitter orientation="|" sizes="0.500468;0.499532" count="2">
       <DockArea name="...">
-       <plot style="Lines" flip_x="false" flip_y="false" mode="TimeSeries">
-        <range top="0.100000" right="20.023775" bottom="-0.100000" left="0.000000"/>
+       <plot style="Lines" mode="TimeSeries" flip_y="false" flip_x="false">
+        <range bottom="-4.033650" top="4.051383" left="0.000000" right="24.000222"/>
         <limitY/>
-        <curve name="/drone_1/position_cmd/acceleration/x" color="#17becf"/>
-        <curve name="/drone_1/position_cmd/acceleration/y" color="#bcbd22"/>
-        <curve name="/drone_1/position_cmd/acceleration/z" color="#1f77b4"/>
+        <curve name="/drone_1/position_cmd/acceleration/x" color="#1f77b4"/>
+        <curve name="/drone_1/position_cmd/acceleration/y" color="#d62728"/>
+        <curve name="/drone_1/position_cmd/acceleration/z" color="#1ac938"/>
        </plot>
       </DockArea>
       <DockArea name="...">
-       <plot style="Lines" flip_x="false" flip_y="false" mode="TimeSeries">
-        <range top="0.100000" right="20.023775" bottom="-0.100000" left="0.000000"/>
+       <plot style="Lines" mode="TimeSeries" flip_y="false" flip_x="false">
+        <range bottom="-0.100000" top="4.099987" left="0.000000" right="24.000222"/>
         <limitY/>
         <curve name="abs_a" color="#1f77b4"/>
         <curve name="abs_v" color="#d62728"/>
@@ -91,15 +91,6 @@
  <previouslyLoaded_Datafiles/>
  <!-- - - - - - - - - - - - - - - -->
  <customMathEquations>
-  <snippet name="abs_v">
-   <global></global>
-   <function>return math.sqrt(value*value + v1*v1 + v2*v2)</function>
-   <linked_source>/drone_1/position_cmd/velocity/x</linked_source>
-   <additional_sources>
-    <v1>/drone_1/position_cmd/velocity/y</v1>
-    <v2>/drone_1/position_cmd/velocity/z</v2>
-   </additional_sources>
-  </snippet>
   <snippet name="abs_a">
    <global></global>
    <function>return math.sqrt(value*value + v1*v1 + v2*v2)</function>
@@ -107,6 +98,15 @@
    <additional_sources>
     <v1>/drone_1/position_cmd/acceleration/y</v1>
     <v2>/drone_1/position_cmd/acceleration/z</v2>
+   </additional_sources>
+  </snippet>
+  <snippet name="abs_v">
+   <global></global>
+   <function>return math.sqrt(value*value + v1*v1 + v2*v2)</function>
+   <linked_source>/drone_1/position_cmd/velocity/x</linked_source>
+   <additional_sources>
+    <v1>/drone_1/position_cmd/velocity/y</v1>
+    <v2>/drone_1/position_cmd/velocity/z</v2>
    </additional_sources>
   </snippet>
  </customMathEquations>
