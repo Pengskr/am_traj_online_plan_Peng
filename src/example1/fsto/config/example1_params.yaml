@@ -39,9 +39,9 @@ TryOut:                      5
 
 MaxAccRate:                  3.00   # 如果发现无人机有异常的原地转圈，说明速度方向来不及改变，即即加速度太小
 
-MaxVelRate:                  4.00
+MaxVelRate:                  6.00
 
-WeightT:                     128.0
+WeightT:                     512.0
 
 WeightAcc:                   0.0
 
@@ -63,7 +63,7 @@ Collision_check_horizon:    2.00   # 检查当前轨迹未来 1.5s 是否发生�
 Collision_check_dt:         0.10
 
 Local_goal_ratio:           0.90   # local goal = Local_goal_ratio * sensing radius；该参数小于1考虑路径复用
-Replan_time_ahead:          0.35   # 旧轨迹前向拼接点
+Replan_time_ahead:          0.10   # 旧轨迹前向拼接点
 Min_traj_remaining_time:    1.50   # 当前轨迹剩余时间不足时强制重规划
 Reuse_traj_time:            1.00   # s，从旧轨迹前向拼接点开始，最多复用旧轨迹未来多长时间
 Reuse_traj_dt:              0.80   # s，构造 reusedPrefix 的采样间隔
@@ -71,7 +71,7 @@ Reuse_traj_dt:              0.80   # s，构造 reusedPrefix 的采样间隔
 Min_replan_interval:        0.50   # 防止过于频繁发布新轨迹
 Emergency_stop_duration:    1.00   # 刹停轨迹持续时间
 Local_goal_sample_angle:    40.0   # degree 局部目标候选采样角度间隔
-Local_goal_speed:           0.2
+Local_goal_speed:           0.20
 
 # 算法选择
 Alg:                         3      # 2 - 时域缩放； 3 - 精细化局部约束处理
