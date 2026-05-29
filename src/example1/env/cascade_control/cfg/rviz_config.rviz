@@ -14,7 +14,7 @@ Panels:
         - /Route1
         - /Route1/Namespaces1
       Splitter Ratio: 0.5472221970558167
-    Tree Height: 899
+    Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -162,7 +162,7 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 5.25
+            Max Value: 4.849999904632568
             Min Value: -0.15000000596046448
             Value: true
           Axis: Z
@@ -194,7 +194,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        trajectory: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker

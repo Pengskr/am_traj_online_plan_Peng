@@ -37,7 +37,7 @@ R3_cost_improvement_threshold:    0.50    # m，cost 降低小于该值认为没
 
 TryOut:                      5
 
-MaxAccRate:                  4.00   # 如果发现无人机有异常的原地转圈，说明速度方向来不及改变，即即加速度太小
+MaxAccRate:                  3.00   # 如果发现无人机有异常的原地转圈，说明速度方向来不及改变，即即加速度太小
 
 MaxVelRate:                  4.00
 

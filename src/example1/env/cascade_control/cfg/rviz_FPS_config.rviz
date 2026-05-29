@@ -192,7 +192,7 @@ Visualization Manager:
       Marker Topic: /fsto/visualization/applied_trajectory
       Name: Optimal traj
       Namespaces:
-        trajectory: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -395,5 +395,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 925
-  X: 995
+  X: 998
   Y: 2008
